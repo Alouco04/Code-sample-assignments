@@ -1,0 +1,3072 @@
+---
+title: "Measurement of Policy  Outcome , HW4"
+author: "Alex Vaval"
+date: "10/22/2020"
+output:
+  pdf_document:
+    fig_caption: yes 
+
+---
+# Inequality in cote d'ivoire
+## 1. Sampling the outliers
+
+### (a)
+
+There are several limitations of survey data.
+
+First,survey data is based on a household's subjective view of its belongings,consumption and income. Studies have shown that households tend to under report their income, because they simply do not count certain flows as income and also because they simply recall the amount incorrectly. Therefore, when compared to official income data we see that surveys do not match. The data obtained from these surveys consequently depends on the exhaustiveness of the survey itself.
+
+
+Second, survey data might not be ideal to measure inequality because depending on your place on the income distribution, you might have incentives to under report your income.In the case of High income earners for example,  we would expect them to under report their income for tax evasion purposes but also to prevent policy makers from making the tax system more progressive. We might also expect low income earners to under report their income but for redistributive purposes.The higher the inequality seems, the higher the pressure on policy makers to make more redistributive policies.
+In any case, inequality would tend to be under estimated.
+
+
+Third, it is possible for household to not answer the survey which could bias the results of the survey and may not reflect well the real levels of inequality. Here, we would again  expect high earners to not answer these surveys but also low income earners because they may not have the time to do so. Indeed, low income earners are more likely to work physically demanding jobs and work longer hours, therefore they would not have the time to answer such surveys.
+The result would be a clear under estimation of the level of inequality.
+
+
+
+### (b)
+
+The outliers should not be included in the survey because, inequality measures are usually sensitive to outliers.
+Inequality measures such as the coefficient of variation or the Atkinson measure for example depend of the mean which is very sentive to outliers.
+
+### (c)
+
+```{r,include=FALSE}
+library(haven)
+library(broom)
+library(kableExtra)
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(pastecs)
+library(Hmisc)
+library(laeken)
+library(psych)
+library(broom)
+library(spatstat.data)
+library(spatstat)
+a<-read_dta("Data/civ_87_08.dta") %>% mutate(individual=1)
+```
+
+```{r,include=F}
+a<-a %>% mutate(conspi=constot/hhsize)
+
+
+GIC.a<-a %>% mutate(Nweight=weight*hhsize)
+cdf_a<-ewcdf(GIC.a$conspi,w=a$Nweight)
+ptile.a.1<-tidy(quantile(cdf_a,probs=seq(0.25,1,0.25)))
+
+
+a.87<-a %>% filter(year=="1987")
+ a.87<-a.87%>% mutate(Logcons=log(conspi))%>% 
+  mutate(sd_logcons=sd(Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)%>%
+   mutate(try=conspi*weight)
+
+a.98<-a %>% filter(year=="1998")%>%  mutate(Logcons=log(conspi)) 
+  a.98<-a.98%>% mutate(sd_logcons=sd(a.98$Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+                                  
+a.08<-a %>% filter(year=="2008")%>%  mutate(Logcons=log(conspi))
+  a.08<-a.08%>% mutate(sd_logcons=sd(a.08$Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+
+  
+
+```
+
+```{r,echo=F,fig.show="hold",out.width="50%"}
+
+hist(a.87$conspi,xlab = "Consumption per capita",
+     main = "Distribution of consumption per capita (1987)",
+     breaks = 500)
+
+hist(a.98$conspi,xlab = "Consumption per capita",
+     main = "Distribution of consumption per capita (1998)",
+     breaks = 500)
+
+hist(a.08$conspi,xlab = "Consumption per capita",
+     main = "Distribution of consumption per capita (2008)",
+     breaks = 500)
+     
+     
+```
+We've computed the level of consumption per capita  by year for each household.
+We notice that the distributions are heavily skewed rightward with a long right tail meaning we have outliers.
+Let us notice how the tail of the distribution is longest for the year 2008.
+
+
+
+### (d)
+
+- Using logaritms is useful because it compresses positive  right skewed distributions into approximately normal distributions, it makes the outliers less impactful on our distribution. In the case of income distributions, because logaritmhs are frequently used because this type of distribution is usually log normal which makes it easier to drop outliers by using the normal distribution thresholds.
+
+- Using 3 standards deviations away from the mean assures that we get aroung 99% because of the normality of the distribution. Said otherwise, if we were to run a random experiment in which we select randomly select a HH, 99% of the time it would be 3 standard deviation from the mean.The 1% that we are leaving out are consumption amounts that have very little probability of being selected.
+
+- Using the median makes more sense than the weighted median because, we use the weights so that our sample represents the population. However, our purpose here is to get rid of outliers in our data which would not require the use of weights.
+
+```{r,include=F}
+
+a.87<-a %>% filter(year=="1987")
+ a.87<-a.87%>% mutate(Logcons=log(conspi))%>% 
+  mutate(sd_logcons=sd(Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+
+a.98<-a %>% filter(year=="1998")%>%  mutate(Logcons=log(conspi)) 
+  a.98<-a.98%>% mutate(sd_logcons=sd(a.98$Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+                                  
+a.08<-a %>% filter(year=="2008")%>%  mutate(Logcons=log(conspi))
+  a.08<-a.08%>% mutate(sd_logcons=sd(a.08$Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+
+b<-rbind(a.87,a.98,a.08)
+```
+
+```{r,echo=F,fig.show="hold",out.width="50%"}
+
+hist(a.87$Logcons,xlab = "Log of consumption",
+     main = "Histogram of log consumption in 1987",
+     breaks=500)
+
+
+hist(a.98$Logcons,xlab = "Log of consumption",
+     main = "Histogram of log consumption in 1998",
+     breaks = 500)
+
+hist(a.08$Logcons,xlab = "Log of consumption",
+     main = "Histogram of log consumption in 2008",
+     breaks = 500)
+
+
+```
+
+- We create that new variable "Logcons" which is the logarithm of consumption per capita. We summarize the variable in order to find the standard deviation, then we filter values above and below 3 standard deviation. 
+We drop in total 121 observations.
+
+Let us mention how, when compared to our previous histogram of the unfiltered data, our three distributions resemble a normal one.
+
+
+## 2. Consumer Price Index and Purchasing Power Parity
+
+### (a)
+
+Using normal weights to compute average share of food for the representative household we have:
+
+$\frac{\sum_{i = 1}^{N} Wi*\frac{fi}{Ci}}{\sum_{i = 1}^{N} Wi}$
+
+- Wi are the household weights
+- fi is consumption of food,
+- Ci is total household consumption
+
+This method does not give us the average food share for the repesentative household which is:
+
+$\frac{\sum_{i = 1}^{N} Wi*fi}{\sum_{i = 1}^{N} Wi*Ci}$
+
+
+Using the new weights we see that it is exactly what we get there:
+
+$\frac{\sum_{i = 1}^{N} Wi*Hi*ci\frac{f}{C}}{\sum_{i = 1}^{N} Wi*Hi*ci}$
+
+- Hi is the household size
+- ci is the consumption per capita
+
+$ci = \frac{C}{Hi}$
+
+$\frac{\sum_{i = 1}^{N} Wi*Hi*\frac{C}{Hi}\frac{f}{C}}{\sum_{i=1}^{N}*Wi*Hi*\frac{C}{Hi}}=\frac{\sum_{i = 1}^{N} Wi*fi}{\sum_{i = 1}^{N} Wi*Ci}$
+
+
+```{r,include=F}
+a.N.87<- a.87 %>% filter(north==1)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight
+  filter(dummy==1)
+
+a.N.98<- a.98 %>% filter(north==1)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight
+  filter(dummy==1)
+
+a.N.08<- a.08 %>% filter(north==1)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight
+  filter(dummy==1)
+
+#filtering north df by year with represnetative
+#Household.
+
+
+fs.1<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Share="Food share")
+fs.1<- fs.1 %>%mutate(`1987`=
+weighted.mean(a.N.87$share_food,a.N.87$Adj_weight))
+fs.1<- fs.1 %>%mutate(`1998`=
+weighted.mean(a.N.98$share_food,a.N.98$Adj_weight))
+fs.1<-fs.1 %>%mutate(`2008`=
+weighted.mean(a.N.08$share_food,a.N.08$Adj_weight))
+# computing food share per year in a new df
+
+fs.2<-a %>% filter(hhid==1020)%>% select(.) %>%
+  mutate(`Share`="Non-food share")
+fs.2<- fs.2 %>%mutate(`1987`=
+weighted.mean(a.N.87$share_nonfood,a.N.87$Adj_weight))
+fs.2<- fs.2 %>%mutate(`1998`=
+weighted.mean(a.N.98$share_nonfood,a.N.98$Adj_weight))
+fs.2<-fs.2 %>%mutate(`2008`=
+weighted.mean(a.N.08$share_nonfood,a.N.08$Adj_weight))
+#computing non food share in a new df
+
+c_sh.nor<-rbind(fs.1,fs.2)
+#merging df for north
+
+
+a.S.87<- a.87 %>% filter(north==0)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight  
+filter(dummy==1)
+
+
+
+a.S.98<- a.98 %>% filter(north==0)%>% 
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight  
+filter(dummy==1)
+
+a.S.08<- a.08 %>% filter(north==0)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight  
+filter(dummy==1)
+
+fs.3<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Share="Food share")
+fs.3<- fs.3 %>%mutate(`1987`=
+weighted.mean(a.S.87$share_food,a.S.87$Adj_weight))
+fs.3<- fs.3 %>%mutate(`1998`=
+weighted.mean(a.S.98$share_food,a.S.98$Adj_weight))
+fs.3<-fs.3 %>%mutate(`2008`=
+weighted.mean(a.S.08$share_food,a.S.08$Adj_weight))
+# computing food share per year in a new df
+
+fs.4<-a %>% filter(hhid==1020)%>% select(.) %>%
+  mutate(`Share`="Non-food share")
+fs.4<- fs.4 %>%mutate(`1987`=
+weighted.mean(a.S.87$share_nonfood,a.S.87$Adj_weight))
+fs.4<- fs.4 %>%mutate(`1998`=
+weighted.mean(a.S.98$share_nonfood,a.S.98$Adj_weight))
+fs.4<-fs.4 %>%mutate(`2008`=
+weighted.mean(a.S.08$share_nonfood,a.S.08$Adj_weight))
+#computing non food share in a new df
+
+c_sh.sou<-rbind(fs.3,fs.4)
+#creating df for north
+
+#created data set with only representative HH.
+#summed total income and computed the shares
+#used HH weights
+
+C.sha<-rbind(c_sh.nor,c_sh.sou)
+
+```
+
+```{r,echo=F}
+kable(C.sha,caption="Average
+      budget shares of the representative Household",
+      col.names=c("Budget share","1987","1998","2008"),
+      align=c("l","c","c","c"),
+      digits=4,booktab=T)%>%
+  pack_rows("Northern Region",1,2)%>%
+  pack_rows("Southern Region",3,4)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+```
+
+We see that for the representative household, food represents a significant share of total consumption. Following engel's law, we can infer that these households have a relatively low income levels. Lastly, because the share of food is higher in the Northern region, we would expect it to have lower income compared to the south and therefore potentially higher poverty rates.
+
+
+
+
+
+### (b)
+
+```{r,include=F}
+b.N.87<-a.87 %>% filter(north==1) %>%mutate(individual=1)
+b.N.98<-a.98 %>% filter(north==1)%>%mutate(individual=1)
+b.N.08<-a.08 %>% filter(north==1)%>%mutate(individual=1)
+
+b.S.87<-a.87 %>% filter(north==0)%>%mutate(individual=1)
+b.S.98<-a.98 %>% filter(north==0)%>%mutate(individual=1)
+b.S.08<-a.08 %>% filter(north==0)%>%mutate(individual=1)
+
+
+```
+
+```{r,include=FALSE}
+
+#method2
+# in this method we use the budget share
+#variables and we use the average prices
+#as the prices and the budget shares
+#act like 2 goods
+
+
+#created a df with just variables needed
+# we do this for all years in the north
+# then the south
+#converted budget shares into decimales
+#or else index is above 1
+
+las.2.87.n<-b.N.87 %>%filter(hhid=="26002")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.N.87$individual))
+
+
+las.2.98.n<-b.N.98 %>%filter(hhid=="54001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.N.98$individual))
+
+las.2.08.n<-b.N.08 %>%filter(hhid=="157001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.N.08$individual))
+
+
+#create a df with laspeyres indices for 
+# every period referencing to the 
+# dataframes that we previously created
+LAS.m2.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="North") %>%
+  mutate(`1987`=
+(las.2.87.n$avprice_food/
+   las.2.87.n$avprice_food)*las.2.87.n$bdgshr_food + 
+(las.2.87.n$avprice_othr/
+   las.2.87.n$avprice_othr)*las.2.87.n$bdgshr_othr)%>%
+ mutate(`1998`=
+(las.2.98.n$avprice_food/
+   las.2.87.n$avprice_food)*las.2.87.n$bdgshr_food + 
+(las.2.98.n$avprice_othr/
+   las.2.87.n$avprice_othr)*las.2.87.n$bdgshr_othr)%>%
+mutate(`2008`=
+(las.2.08.n$avprice_food/
+   las.2.87.n$avprice_food)*
+  las.2.87.n$bdgshr_food + 
+(las.2.08.n$avprice_othr/
+   las.2.87.n$avprice_othr)*las.2.87.n$bdgshr_othr)
+
+Obs.n<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations (N)")%>%mutate(`1987`=sum(las.2.87.n$Observations))%>%
+  mutate(`1998`=sum(las.2.98.n$Observations))%>%
+  mutate(`2008`=sum(sum(las.2.08.n$Observations)))
+
+
+
+# we do exact same thing for the south
+las.2.87.s<-b.S.87 %>%filter(hhid=="6001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.S.87$individual))
+
+las.2.98.s<-b.S.98 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.S.98$individual))
+
+las.2.08.s<-b.S.08 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.N.08$individual))
+
+LAS.m2.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="South") %>%
+  mutate(`1987`=
+(las.2.87.s$avprice_food/
+   las.2.87.s$avprice_food)*
+  las.2.87.s$bdgshr_food + 
+(las.2.87.s$avprice_othr/
+   las.2.87.s$avprice_othr)*
+  las.2.87.s$bdgshr_othr)%>%
+ mutate(`1998`=(las.2.98.s$avprice_food/
+  las.2.87.s$avprice_food)*
+    las.2.87.s$bdgshr_food + 
+(las.2.98.s$avprice_othr/
+   las.2.87.s$avprice_othr)*
+  las.2.87.s$bdgshr_othr)%>%
+mutate(`2008`=(las.2.08.s$avprice_food/
+     las.2.87.s$avprice_food)*
+         las.2.87.s$bdgshr_food + 
+(las.2.08.s$avprice_othr/
+   las.2.87.s$avprice_othr)*las.2.87.s$bdgshr_othr)
+
+Obs.s<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations (S)")%>%mutate(`1987`=sum(las.2.87.s$Observations))%>%
+  mutate(`1998`=sum(las.2.98.s$Observations))%>%
+  mutate(`2008`=sum(sum(las.2.08.s$Observations)))
+#Las.0<-rbind(LAS.m2.N,LAS.m2.S)
+#Las.1<-rbind(Obs.n,Obs.s)
+
+#we combine the north and south df
+# to have indices for North and 
+#south in a single df
+LAS.m2<-rbind(LAS.m2.N,LAS.m2.S)
+  
+```
+
+
+```{r,include=F}
+
+pas.87.n<-b.N.87 %>%filter(hhid=="26002")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr,individual)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.98.n<-b.N.98 %>%filter(hhid=="54001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr,individual)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+pas.08.n<-b.N.08 %>%filter(hhid=="157001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr,individual)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+
+#create a df with laspeyres indices for 
+# every period referencing to the 
+# dataframes that we previously created
+
+PAS.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="North") %>%
+  mutate(`1987`=
+1/((pas.87.n$avprice_food/
+   pas.87.n$avprice_food)*pas.87.n$bdgshr_food + 
+(pas.87.n$avprice_othr/
+   pas.87.n$avprice_othr)*pas.87.n$bdgshr_othr))%>%
+ mutate(`1998`=
+1/((pas.87.n$avprice_food/
+   pas.98.n$avprice_food)*pas.98.n$bdgshr_food + 
+(pas.87.n$avprice_othr/
+   pas.98.n$avprice_othr)*pas.98.n$bdgshr_othr))%>%
+mutate(`2008`=
+1/((pas.87.n$avprice_food/
+   pas.08.n$avprice_food)*
+  pas.08.n$bdgshr_food + 
+(pas.87.n$avprice_othr/
+   pas.08.n$avprice_othr)*pas.08.n$bdgshr_othr))
+
+
+
+# we do exact same thing for the south
+pas.87.s<-b.S.87 %>%filter(hhid=="6001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.98.s<-b.S.98 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+pas.08.s<-b.S.08 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+PAS.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="South") %>%
+  mutate(`1987`=
+(1/(pas.87.s$avprice_food/
+   pas.87.s$avprice_food)*
+  pas.87.s$bdgshr_food + 
+(pas.87.s$avprice_othr/
+   pas.87.s$avprice_othr)*
+  pas.87.s$bdgshr_othr))%>%
+ mutate(`1998`=1/((pas.87.s$avprice_food/
+  pas.98.s$avprice_food)*
+    pas.98.s$bdgshr_food + 
+(pas.87.s$avprice_othr/
+   pas.98.s$avprice_othr)*
+  pas.98.s$bdgshr_othr))%>%
+mutate(`2008`=1/((pas.87.s$avprice_food/
+     pas.08.s$avprice_food)*
+         pas.08.s$bdgshr_food + 
+(pas.87.s$avprice_othr/
+   pas.08.s$avprice_othr)*pas.08.s$bdgshr_othr))
+#Pas.0<-rbind(PAS.N,PAS.S)
+#Pas.1<-rbind(Obs.n,Obs.s)
+#we combine the north and south df
+# to have indices for North and 
+#south in a single df
+PAS<-rbind(PAS.N,PAS.S)
+  
+CPI<-rbind(LAS.m2,PAS)
+
+```
+
+```{r,echo=F}
+kable(CPI,caption="CPI measures for the years 1987-1998-2008",col.names=c("Index","1987","1998","2008"),align=c("l","c","c","c"),digits=4,booktab=T)%>%kable_styling()%>%
+  pack_rows("Laspeyres",1,2) %>%
+  pack_rows("Paasche",3,4)%>%
+  kable_styling(latex_options = "HOLD_position")%>%
+  add_footnote("Base is 1 not 100")
+
+```
+
+Looking at the two measures, we notice that prices have increased more in the South compared to the North (80% vs 92% for 1998 and 140% vs 156% for 2008). Second, we see that prices there has been a bigger price increase between 1987 and 1998 than between 1998 and 2008 (mostly due to the devaluation of the francs CFA in 1994).
+Third, we see that there is virtually no difference between the two indices (can only be seen going 3 decimals after the comma) but Laspeyres>Paasche except for 2008 which is somewhat surprising.
+
+### (c)
+
+```{r,include=F}
+#we are going to use the same
+#code as before but we are going
+# to use the south as base reference
+#meaning that every time we used 1987
+#as base, we'll change that to the
+#same year but for the south
+
+las.2.87.n<-b.N.87 %>%filter(hhid=="26002")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+las.2.98.n<-b.N.98 %>%filter(hhid=="54001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+las.2.08.n<-b.N.08 %>%filter(hhid=="157001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+las.2.87.s<-b.S.87 %>%filter(hhid=="6001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+las.2.98.s<-b.S.98 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+las.2.08.s<-b.S.08 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+
+LAS.N.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Laspeyres") %>%
+  mutate(`1987`=
+(las.2.87.n$avprice_food/
+   las.2.87.s$avprice_food)*las.2.87.s$bdgshr_food + 
+(las.2.87.n$avprice_othr/
+   las.2.87.s$avprice_othr)*las.2.87.s$bdgshr_othr)%>%
+ mutate(`1998`=
+(las.2.98.n$avprice_food/
+   las.2.98.s$avprice_food)*las.2.98.s$bdgshr_food + 
+(las.2.98.n$avprice_othr/
+   las.2.98.s$avprice_othr)*las.2.98.s$bdgshr_othr)%>%
+mutate(`2008`=
+(las.2.08.n$avprice_food/
+   las.2.08.s$avprice_food)*
+  las.2.08.s$bdgshr_food + 
+(las.2.08.n$avprice_othr/
+   las.2.08.s$avprice_othr)*las.2.08.s$bdgshr_othr)
+
+
+
+pas.87.n<-b.N.87 %>%filter(hhid=="26002")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.98.n<-b.N.98 %>%filter(hhid=="54001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+pas.08.n<-b.N.08 %>%filter(hhid=="157001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.87.s<-b.S.87 %>%filter(hhid=="6001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.98.s<-b.S.98 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+pas.08.s<-b.S.08 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+
+#we do the same thing for paasch
+PAS.N.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Paasche") %>%
+  mutate(`1987`=
+1/((pas.87.s$avprice_food/
+   pas.87.n$avprice_food)*pas.87.n$bdgshr_food + 
+(pas.87.s$avprice_othr/
+   pas.87.n$avprice_othr)*pas.87.n$bdgshr_othr))%>%
+ mutate(`1998`=
+1/((pas.98.s$avprice_food/
+   pas.98.n$avprice_food)*pas.98.n$bdgshr_food + 
+(pas.98.s$avprice_othr/
+   pas.98.n$avprice_othr)*pas.98.n$bdgshr_othr))%>%
+mutate(`2008`=
+1/((pas.08.s$avprice_food/
+   pas.08.n$avprice_food)*
+  pas.08.n$bdgshr_food + 
+(pas.08.s$avprice_othr/
+   pas.08.n$avprice_othr)*pas.08.n$bdgshr_othr))
+
+#we create the fisher index with our indices
+#computed above, the product of 
+# the square root of both index
+FIS.N.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Fisher") %>% 
+  mutate(`1987`=sqrt(PAS.N.S$`1987`)*sqrt(LAS.N.S$`1987`))%>%
+  mutate(`1998`=sqrt(PAS.N.S$`1998`)*sqrt(LAS.N.S$`1998`))%>%
+  mutate(`2008`=sqrt(PAS.N.S$`2008`)*sqrt(LAS.N.S$`2008`))
+
+
+IND<-rbind(LAS.N.S,PAS.N.S,FIS.N.S)
+
+#IND<-rbind(I,Obs.n)
+
+
+```
+
+```{r,echo=F}
+kable(IND,caption="PPP measures for the years
+      1987-1998-2008 for the North",
+      col.names=c("Index","1987","1998","2008"),
+      align=c("l","c","c","c"),
+      digits=4,booktab=T)%>%
+  kable_styling(latex_options = "HOLD_position")%>%
+  add_footnote("Base is 1 not 100")
+
+  
+
+```
+
+First, we see that the laspeyres index is greater than the Fisher index which itself is greater than the Paasche index.
+Second, we that prices have always been higher in the south as compared to the north,27%,31%,34% for the years 1987,1998 and 2008.
+Third, we can say that it confirms our previous findings on the differences of prices between 2 regions.
+
+
+
+### (d)
+
+```{r,include=F}
+b.N.87<-a.87 %>% filter(north==1)
+b.N.98<-a.98 %>% filter(north==1)
+b.N.08<-a.08 %>% filter(north==1)
+
+b.S.87<-a.87 %>% filter(north==0)
+b.S.98<-a.98 %>% filter(north==0)
+b.S.08<-a.08 %>% filter(north==0)
+
+
+d.N.87<-b.N.87 %>% mutate(Adj_conspc=conspc/(ppp/100))%>%
+  mutate(Adj_conspc=Adj_conspc/(cpi/100))
+d.N.98<-b.N.98 %>% mutate(Adj_conspc=conspc/(ppp/100))%>% 
+  mutate(Adj_conspc=Adj_conspc/(192.45/100))
+d.N.08<-b.N.08 %>% mutate(Adj_conspc=conspc/(ppp/100))%>% 
+  mutate(Adj_conspc=Adj_conspc/(255.73/100))
+
+d.S.87<-b.S.87 %>% mutate(Adj_conspc=conspc/(ppp/100))%>%
+  mutate(Adj_conspc=Adj_conspc/(cpi/100))
+d.S.98<-b.S.98 %>% mutate(Adj_conspc=conspc/(ppp/100))%>% 
+  mutate(Adj_conspc=Adj_conspc/(cpi/100))
+d.S.08<-b.S.08 %>% mutate(Adj_conspc=conspc/(ppp/100))%>%
+  mutate(Adj_conspc=Adj_conspc/(cpi/100))
+  
+#here adjusted consumption based on purchasing power
+#we divided it by the PPP index to have the real
+#purchasing power
+
+#we then adjusted the food price for inflation of the
+#south. We first took away the inflation of the north
+#by dividing the avgprice_north then we
+#multiplied it by the price index of the south
+
+# NOTE : could probably compute it yourself
+#by using the numerical value of the avprice
+# of 1987 then just multipliying by south
+#cpi
+
+
+
+d.87.N.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1987-")%>%mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.87$conspc))
+
+d.87.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1987-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.87$conspc))
+
+d.87.A<-rbind(d.87.N.A,d.87.S.A)
+
+
+d.98.N.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1998-")%>%mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.87$Adj_conspc))
+
+d.98.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1998-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.98$conspc))
+
+d.98.A<-rbind(d.98.N.A,d.98.S.A)
+
+
+d.08.N.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(year="-2008-")%>% mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.08$Adj_conspc))
+
+d.08.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-2008-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.08$conspc))
+
+d.08.A<-rbind(d.08.N.A,d.08.S.A)
+
+
+
+
+d.87.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(year="-1987-")%>% mutate(Region="North") %>% 
+   mutate(avg_cpc= mean(d.N.87$conspc))
+
+d.87.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1987-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.87$conspc))
+
+d.87.B<-rbind(d.87.N,d.87.S.A)
+
+d.98.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1998-")%>%mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.98$conspc))
+
+d.98.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1998-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.98$conspc))
+
+d.98.B<-rbind(d.98.N,d.98.S.A)
+
+
+d.08.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-2008-")%>%mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.08$conspc))
+
+
+d.08.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-2008-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.08$conspc))
+
+d.08.B<-rbind(d.08.N,d.08.S.A)
+
+d.Nadj<-rbind(d.87.B,d.98.B,d.08.B)
+
+d.adj<-rbind(d.87.A,d.98.A,d.08.A)
+
+Tab<-rbind(d.Nadj,d.adj)
+
+
+```
+
+```{r,echo=F}
+
+kable(Tab,caption=" Average consumption per capita made comparable
+      between North and South",col.names=c("Year","Region", 
+          "Average consumption per capita"),align=c("l","c","c"),
+      digits=2,booktab=T)%>%kable_styling()%>%
+  kable_styling(latex_options = "HOLD_position")%>%
+  pack_rows("Without adjustement",1,6)%>%
+  pack_rows("With adjustement",7,12)
+
+```                      
+
+Converting the consumption with respect to the south, we notice that average consumption per capita it is higher than without the adjustment for 1987 and 1998 but not for 2008 where it falls below the 1987 levels. 
+
+## 3. Absolute measure of poverty
+### (a)
+
+```{r,include=F}
+#creating a dummy which is 1 when HH's consumption
+#is under 237. Also creating a variable individual
+#which is equal to 1 for every observation
+
+
+#filtering by year and by region by using previous DF
+# Creating an additional one for national level.
+e.87.N<-d.N.87 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.98.N<-d.N.98 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.08.N<-d.N.08 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+
+e.87.S<-d.S.87 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.98.S<-d.S.98 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.08.S<-d.S.08 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+
+e.87.NAT<-rbind(e.87.N,e.87.S)
+e.98.NAT<-rbind(e.98.N,e.98.S)
+e.08.NAT<-rbind(e.08.N,e.08.S)
+
+#creating blank df for each year and level of 
+#analysis. Theyll contain the poverty rate
+# computing by using the dfs above. 
+e.87.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%
+  mutate(Povrate_87=sum(e.87.N$Poor*e.87.N$Nweight)/
+           sum(e.87.N$individual*e.87.N$Nweight))
+
+
+
+#create a df for the number of obervation, the rbinding
+#them with the corresponding df by year then by  by
+#cbinding them to have a complete data frame
+
+Obs.e.87.n<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations")%>%mutate(Povrate_87=396)
+
+e.87.Np<-rbind(e.87.Np,Obs.e.87.n)
+
+# for south 87
+e.87.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=sum(e.87.S$Poor*e.87.S$Nweight)/
+    sum(e.87.S$individual*e.87.S$Nweight))
+
+Obs.e.87.s<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations")%>%
+  mutate(Povrate_87=1188)
+
+e.87.Sp<-rbind(e.87.Sp,Obs.e.87.s)
+
+#for national level 87
+e.87.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%
+  mutate(Povrate_87=sum(e.87.NAT$Poor*e.87.NAT$Nweight)/
+                sum(e.87.NAT$individual*e.87.N$Nweight))
+
+Obs.e.87.nat<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations")%>%
+  mutate(Povrate_87=sum(a.87$individual))
+
+e.87.Natp<-rbind(e.87.Natp,Obs.e.87.nat)
+
+#rbinding the 1987 df
+Obs.87<-cbind(Obs.e.87.n,Obs.e.87.s,Obs.e.87.nat)
+Poor.87<-rbind(e.87.Np,e.87.Sp,e.87.Natp)
+
+
+#for north 98
+e.98.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+   mutate(Povrate_98=sum(e.98.N$Poor*e.98.N$Nweight)/
+          sum(e.98.N$individual*e.98.N$Nweight))
+
+Obs.e.98.n<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=969)
+
+e.98.Np<-rbind(e.98.Np,Obs.e.98.n)
+
+#for south 98
+e.98.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=sum(e.98.S$Poor*e.98.S$Nweight)/
+          sum(e.98.S$individual*e.98.S$Nweight))
+
+Obs.e.98.s<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=3182)
+
+e.98.Sp<-rbind(e.98.Sp,Obs.e.98.s)
+
+#for national 98
+e.98.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+   mutate(Povrate_98=sum(e.98.NAT$Poor*e.98.NAT$Nweight)/
+           sum(e.98.NAT$individual*e.98.NAT$Nweight))
+
+Obs.e.98.nat<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=sum(a.98$individual))
+
+e.98.Natp<-rbind(e.98.Natp,Obs.e.98.nat)
+
+#rbinding the 1998 df
+
+Poor.98<-rbind(e.98.Np,e.98.Sp,e.98.Natp)
+
+
+#For 2008 north
+e.08.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+   mutate(Povrate_08=sum(e.08.N$Poor*e.08.N$Nweight)/
+           sum(e.08.N$individual*e.08.N$Nweight))
+
+Obs.e.08.n<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=3597)
+
+e.08.Np<-rbind(e.08.Np,Obs.e.08.n)
+
+
+#for 2008 south
+e.08.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+mutate(Povrate_08=sum(e.08.S$Poor*e.08.S$Nweight)/
+          sum(e.08.S$individual*e.08.S$Nweight))
+
+Obs.e.08.s<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=3597)
+
+e.08.Sp<-rbind(e.08.Sp,Obs.e.08.s)
+
+#for 2008 national
+e.08.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=sum(e.08.NAT$Poor*e.08.NAT$Nweight)/
+          sum(e.08.NAT$individual*e.08.NAT$Nweight))
+
+Obs.e.08.nat<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=sum(a.08$individual))
+
+e.08.Natp<-rbind(e.08.Natp,Obs.e.08.nat)
+
+#rbinding the 2008 df
+Poor.08<-rbind(e.08.Np,e.08.Sp,e.08.Natp)
+
+
+
+
+Poor<-cbind(Poor.87,Poor.98,Poor.08)
+ 
+
+
+
+```
+
+
+
+```{r,echo=F}
+kable(Poor,caption="Poverty rates in 1987-1998-2008 on different geographical levels",col.names=c("Level","1987",
+  "1998","2008"),
+      align=c("l","c","c","c"),
+      digits=3,booktab=T)%>%kable_styling()%>%
+  pack_rows("North",1,2)%>%
+  pack_rows("South",3,4)%>%
+   pack_rows("National",5,5)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+
+```
+
+Looking at the table we notice that poverty rates the northern region is poorer in 1987 and 2008 but not 1998.
+
+Indeed, for the year 1987, the Northern region of the Ivory Coast seems to have a poverty rate that is 3 percentage points higher  as compared to the South (24.4% vs 21%). Whereas for the period 1998, we come up with the opposite conclusion, the south has a poverty rate that is about 3 percentage points higher than that of the North (46% vs 43%). 
+For the last period 2008, the Northern region has again a higher poverty rate (55% vs 52%).
+
+For both regions and therefore on the national level, we notice that the poverty rate follows an increasing trend. Between 1987 and 1998, the poverty rate doubles, going from 22.3%  to 45%, it reaches 52% in 2008.
+
+
+
+### (b)
+
+```{r,include=F}
+e.87.N<-d.N.87 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.98.N<-d.N.98 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.08.N<-d.N.08 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+
+e.87.S<-d.S.87 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.98.S<-d.S.98 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.08.S<-d.S.08 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+
+e.87.NAT<-rbind(e.87.N,e.87.S)
+e.98.NAT<-rbind(e.98.N,e.98.S)
+e.08.NAT<-rbind(e.08.N,e.08.S)
+
+e.87.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=sum(e.87.N$Poor*e.87.N$Nweight)/sum(e.87.N$individual*e.87.N$Nweight))
+
+e.87.Np<-rbind(e.87.Np,Obs.e.87.n)
+
+e.87.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=sum(e.87.S$Poor*e.87.S$Nweight)/
+           sum(e.87.S$individual*e.87.S$Nweight))
+
+e.87.Sp<-rbind(e.87.Sp,Obs.e.87.s)
+
+e.87.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=sum(e.87.NAT$Poor*e.87.NAT$Nweight)/ sum(e.87.NAT$individual*e.87.N$Nweight))
+
+e.87.Natp<-rbind(e.87.Natp,Obs.e.87.nat)
+
+Poor.87.1<-rbind(e.87.Np,e.87.Sp,e.87.Natp)
+
+
+e.98.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=sum(e.98.N$Poor*e.98.N$Nweight)/ sum(e.98.N$individual*e.98.N$Nweight))
+
+
+e.98.Np<-rbind(e.98.Np,Obs.e.98.n)
+
+
+e.98.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=sum(e.98.S$Poor*e.98.S$Nweight)/sum(e.98.S$individual*e.98.S$Nweight))
+
+
+e.98.Sp<-rbind(e.98.Sp,Obs.e.98.s)
+
+e.98.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=sum(e.98.NAT$Poor*e.98.NAT$Nweight)/ sum(e.98.NAT$individual*e.98.NAT$Nweight))
+
+e.98.Natp<-rbind(e.98.Natp,Obs.e.98.nat)
+
+
+Poor.98.1<-rbind(e.98.Np,e.98.Sp,e.98.Natp)
+
+e.08.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=sum(e.08.N$Poor*e.08.N$Nweight)/sum(e.08.N$individual*e.08.N$Nweight))
+
+e.08.Np<-rbind(e.08.Np,Obs.e.08.n)
+
+
+
+e.08.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=sum(e.08.S$Poor*e.08.S$Nweight)/sum(e.08.S$individual*e.08.S$Nweight))
+
+e.08.Sp<-rbind(e.08.Sp,Obs.e.08.s)
+
+e.08.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=sum(e.08.NAT$Poor*e.08.NAT$Nweight)/ sum(e.08.NAT$individual*e.08.NAT$Nweight))
+
+e.08.Natp<-rbind(e.08.Natp,Obs.e.08.nat)
+
+Poor.08.1<-rbind(e.08.Np,e.08.Sp,e.08.Natp)
+
+Poor.1<-cbind(Poor.87.1,Poor.98.1,Poor.08.1)
+
+```
+
+```{r,echo=F}
+kable(Poor.1,caption="Poverty rates in 1987-1998-2008 on different geographical levels",
+      col.names=c("Level","1987",
+  "1998","2008"),
+      align=c("l","c","c","c"),
+      digits=3,booktab=T)%>%kable_styling()%>%
+  pack_rows("North",1,2)%>%
+  pack_rows("South",3,4)%>%
+   pack_rows("National",5,6)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+
+```
+ Using the 2$ per day poverty threshold the poverty rates increase significantly. That was to be expected because by taking a higher threshold, we increase the area of the distribution that we consider poor.
+ 
+ First, the significant difference observed here as compared to the previous table means that we have about 40% of people with at least 1$ but less than 2 dollars per day. 
+ 
+ Second, we see the same trend on the national level but with different magnitudes. Between 1987 and 2008, the number of poor relative to the population has increased,going from 64.3% 1987 to 83.1 % in 2008 (an increase of about 30 percent).Let us mention however that the bulk of the increase in poverty happened between 1987 and 1998.
+ 
+ Third, when comparing the North and the South we see that the poverty rates are higher for both regions for all the periods when compared to the 1 USD poverty threshold.
+Also that the South has actually a higher poverty rate than the North in 1987  (which wasn't the case with the 1$ poverty threshold) by about 5 percentage points.
+Indeed, the South has a poverty rate that is 8.42% percent higher (64.1% vs 58.7%) than that of the North whereas previously, the North had a poverty rate that was 16.7% higher.
+
+For the year 1998, as mentioned previously we notice a sharp increase in the poverty rates for both region, 42% increase for the North and 27% increase for the south. However, conclusion is reversed compared to the one made with the 1 USD poverty threshold, the Northern region has a poverty rate that is 3 percentage points higher than the South.
+
+For the year 2008, the North's poverty rate remains about 2 percentage both than that of the South, both region experienced slight increase in their poverty rates.
+
+Lastly,we can say that we have about one fifth of the population that is in a vulnerable situation.
+We say that they're in a vulnerable state because, in normal times they are not considered poor. However they could easily fall into poverty if there is any type of shock that slightly impacts their income such as cocoa shock,currency devaluation,civil war, all of which happened between 1987 and 1998 in the Ivory Coast.
+
+
+
+
+
+
+### (c)
+
+```{r,include=F}
+f.87.N<-e.87.N %>% mutate(Ncpi=100) %>%
+  mutate(newconspc_87=conspc/(100/100))%>%
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.98.N<-e.98.N%>% mutate(Ncpi=192.42)%>%
+  mutate(newconspc_87=conspc/(100/100))%>%
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.08.N<-e.08.N%>% mutate(Ncpi=255.73)%>%
+  mutate(newconspc_87=conspc/(100/100))%>% 
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.87.S<-e.87.S %>% mutate(Ncpi=100) %>%
+  mutate(newconspc_87=conspc/(100/100))%>%
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.98.S<-e.98.S%>% mutate(Ncpi=192.42)%>%
+  mutate(newconspc_87=conspc/(100/100))%>%
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.08.S<-e.08.S%>% mutate(Ncpi=255.73)%>%
+  mutate(newconspc_87=conspc/(100/100))%>% 
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.87.NAT<-rbind(f.87.N,f.87.S)
+f.98.NAT<-rbind(f.98.N,f.98.S)
+f.08.NAT<-rbind(f.08.N,f.08.S)
+
+f.87.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=weighted.mean(f.87.N$Poor,f.87.N$Nweight))
+f.87.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=weighted.mean(f.87.S$Poor,f.87.S$Nweight))
+f.87.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=weighted.mean(f.87.NAT$Poor,f.87.NAT$Nweight))
+
+f.87.Np<-rbind(f.87.Np,Obs.e.87.n)
+f.87.Sp<-rbind(f.87.Sp,Obs.e.87.s)
+f.87.Natp<-rbind(f.87.Np,Obs.e.87.nat)
+Poor.87.2<-rbind(f.87.Np,f.87.Sp,f.87.Natp)
+
+f.98.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=weighted.mean(f.98.N$Poor,f.98.N$Nweight))
+f.98.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=weighted.mean(f.98.S$Poor,f.98.S$Nweight))
+f.98.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=weighted.mean(f.98.NAT$Poor,f.98.NAT$Nweight))
+
+
+f.98.Np<-rbind(f.98.Np,Obs.e.98.n)
+f.98.Sp<-rbind(f.98.Sp,Obs.e.98.s)
+f.98.Natp<-rbind(f.98.Np,Obs.e.98.nat)
+Poor.98.2<-rbind(f.98.Np,f.98.Sp,f.98.Natp)
+
+f.08.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=weighted.mean(f.08.N$Poor,f.08.N$Nweight))
+f.08.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=weighted.mean(f.08.S$Poor,f.08.S$Nweight))
+f.08.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=weighted.mean(f.08.NAT$Poor,f.08.NAT$Nweight))
+
+
+f.08.Np<-rbind(f.08.Np,Obs.e.08.n)
+f.08.Sp<-rbind(f.08.Sp,Obs.e.08.s)
+f.08.Natp<-rbind(f.08.Np,Obs.e.08.nat)
+Poor.08.2<-rbind(f.08.Np,f.08.Sp,f.08.Natp)
+
+Poor.2<-cbind(Poor.87.2,Poor.98.2,Poor.08.2)
+
+```
+
+```{r,echo=F}
+kable(Poor.2,caption="Poverty rates in
+      1987-1998-2008 on different geographical 
+      levels assuming prices and preferences
+      are the same",
+      col.names=c("Level","1987",
+  "1998","2008"),
+      align=c("l","c","c","c"),
+      digits=3,booktab=T)%>%kable_styling()%>%
+  pack_rows("North",1,2)%>%
+  pack_rows("South",3,4)%>%
+   pack_rows("National",5,6)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+```
+When we assume the same purchasing power and the same inflation for the North relative to the south, we notice that the North has a  systematically higher poverty rate than the South for all periods.
+
+A way to understand this would be to say that, if people in the North were to move to the South, about 40% would be considered poor in 1987, 69% would be conisdered poor in 1998 and 74% would be considered poor in 2008.
+
+General conclusion is, the south has a higher standard of living than the North.
+
+## 4. Growth incidence curves
+
+### (a)
+```{r,include=F}
+
+GIC.87<-rbind(d.N.87,d.S.87) %>%
+  mutate(Nweight=weight*hhsize)
+GIC.98<-rbind(d.N.98,d.S.98)%>% 
+  mutate(Nweight=weight*hhsize)
+GIC.08<-rbind(d.N.08,d.S.08)%>% 
+  mutate(Nweight=weight*hhsize)
+
+#computing weighted cumulative distribution
+#of consumpyion per capita
+cdf_87<-ewcdf(GIC.87$Adj_conspc,w=GIC.87$Nweight)
+cdf_98<-ewcdf(GIC.98$Adj_conspc,w=GIC.98$Nweight)
+cdf_08<-ewcdf(GIC.08$Adj_conspc,w=GIC.08$Nweight)
+
+
+#computing percentile for each year.
+ptile.87<-quantile(cdf_87,probs=seq(0.01,1,0.01))
+ptile.98<-quantile(cdf_98,probs=seq(0.01,1,0.01))
+ptile.08<-quantile(cdf_08,probs=seq(0.01,1,0.01))
+
+
+
+```
+View r code. We started by combining data sets for the North and South of the same year (because the way we did the homework previously requires us to create a new Df).
+
+We then created different data frames containing the weighted cumulative distribution of consumption per capita.
+
+Lastly, we used the function quantile, while specifying that it should be percentiles in order to have the dataframe containg percentiles and corresponding income.
+
+
+### (b)
+```{r,include=F}
+g.87<-tidy((ptile.98-ptile.87)/ptile.87) 
+g.98<-tidy((ptile.08-ptile.98)/ptile.98)
+
+```
+
+View r code.
+
+we simply used the dataframe containing the consumption per capita with the percentiles, then we computed the growth rates between the different data frames.
+
+
+### (c)
+
+```{r,include=F}
+
+library(pracma)
+colors <- c("1987-1998" = "blue", "1998-2008" = "green")
+
+curve.1<-tidy(ptile.87)%>%
+  mutate(`1987-1998`=(ptile.98/ptile.87)) %>% 
+  mutate(py87.98=nthroot(`1987-1998`,11)) %>%mutate(py87.98=py87.98-1)
+
+curve.2<-tidy(ptile.98)%>%
+  mutate(`1998-2008`=(ptile.08/ptile.98)) %>%
+  mutate(py98.08=nthroot(`1998-2008`,10))%>%
+  mutate(py98.08=py98.08-1)%>%
+  rename(namez=names)%>%  
+  rename(z=x) %>% select(`1998-2008`,py98.08)
+curves<-cbind(curve.1,curve.2)
+
+`Income percentiles`<-seq(0.01,1,0.01)
+
+c<-ggplot(curves,aes(`Income percentiles`))+
+  geom_line(aes(y=`py87.98`,color="1987-1998")) +
+  geom_line(aes(y=`py98.08`,color="1998-2008"))+
+  ggtitle(label = "Growth incidence curve Cote d'Ivoire",
+              subtitle = "For the years 1987-1998 and 1998-2008")+
+theme(
+  plot.title = element_text(hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)+
+labs(x = "Income percentiles",
+         y = "% Growth",
+         color = "Legend") +
+    scale_color_manual(values = colors)
+
+```
+
+```{r,echo=F,out.width="75%"}
+c+theme_bw()
+
+```
+
+### (d)
+
+Between 1987 and 1998, the consumption per capita of household seems to have decreased for every percentile (negative growth rate), but even more so for the top 5 %, probably contributing to reduce inequalities.
+
+Between 1998-2008, there seems to be a positive correlation between consumption per capita growth rate and consumption per capita percentile meaning that the more a household consumed initially, the more it experienced an increase in its consumption per capita.
+
+Lastly, for the same period below the 88th percentile, growth has been negative, meaning an increase in the spread between the top 10 percentile and the bottom 90 percentile.
+
+
+### (e)
+
+Inequality is likely to increase in 2008 because the growth incidence curve is upward sloping, meaning that a given percentile has a consumption per capita growth rate lower than the one after it.
+
+Also, we see that below the 88th percentile, every consumption per capita percentile has a negative growth rate meaning that people at the bottom of the distribution are getting poorer (experiencing a decline in consumption per capita) while people at the top of the distribution are getting richer( expriencing an increase in their consumption per capita).
+
+
+## Part 5 : Lorenz Curves
+
+
+```{r,include=F}
+#need to create df for north,south
+#and national level.
+#then for each DF, seperate per year.
+#then need to divide by percentile like
+#Q4.a
+
+g.87.N<-d.N.87 %>%mutate(Nweight=weight*hhsize) 
+g.87.N$percentile<-ceiling(100*ewcdf(g.87.N$Adj_conspc,w=g.87.N$Nweight)
+               (g.87.N$Adj_conspc)) 
+
+g.87.n<-g.87.N %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_87_n=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(percentile,cum_87_n) %>%
+  add_row( percentile =22 , cum_87_n = 0.065833273)
+
+g.87.n<-g.87.n[order(g.87.n$cum_87_n),]
+                              
+
+
+g.98.N<-d.N.98 %>%mutate(Nweight=weight*hhsize)
+g.98.N$percentile<-ceiling(100*ewcdf(g.98.N$Adj_conspc,w=g.98.N$Nweight)
+               (g.98.N$Adj_conspc))
+
+g.98.n<-g.98.N %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_98_n=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_98_n)
+  
+  
+g.08.N<-d.N.08 %>%mutate(Nweight=weight*hhsize)
+g.08.N$percentile<-ceiling(100*ewcdf(g.08.N$Adj_conspc,w=g.08.N$Nweight)
+               (g.08.N$Adj_conspc))
+
+g.08.n<-g.08.N %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_08_n=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_08_n)
+
+L.n<-cbind(g.87.n,g.98.n,g.08.n) %>% mutate(norm=seq(0.01,1,0.01)) %>%
+  mutate(percentile=percentile/100)
+
+
+g.87.S<-d.S.87 %>%mutate(Nweight=weight*hhsize) 
+g.87.S$percentile<-ceiling(100*ewcdf(g.87.S$Adj_conspc,w=g.87.S$Nweight)
+               (g.87.S$Adj_conspc)) 
+
+g.87.s<-g.87.S %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_87_s=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(percentile,cum_87_s) 
+                              
+
+
+g.98.S<-d.S.98 %>%mutate(Nweight=weight*hhsize)
+g.98.S$percentile<-ceiling(100*ewcdf(g.98.S$Adj_conspc,w=g.98.S$Nweight)
+               (g.98.S$Adj_conspc))
+
+g.98.s<-g.98.S %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_98_s=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_98_s)
+  
+  
+g.08.S<-d.S.08 %>%mutate(Nweight=weight*hhsize)
+g.08.S$percentile<-ceiling(100*ewcdf(g.08.S$Adj_conspc,w=g.08.S$Nweight)
+               (g.08.S$Adj_conspc))
+
+g.08.s<-g.08.S %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_08_s=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_08_s)
+
+L.s<-cbind(g.87.s,g.98.s,g.08.s) %>% mutate(norm=seq(0.01,1,0.01)) %>%
+  mutate(percentile=percentile/100)
+
+
+
+
+
+
+
+ g.87.NAT<-GIC.87 %>%mutate(Nweight=weight*hhsize) 
+g.87.NAT$percentile<-ceiling(100*ewcdf( g.87.NAT$Adj_conspc,w= g.87.NAT$Nweight)
+               ( g.87.NAT$Adj_conspc)) 
+
+g.87.nat<-g.87.NAT %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_87_nat=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(percentile,cum_87_nat)
+                              
+
+
+g.98.NAT<-GIC.98 %>%mutate(Nweight=weight*hhsize)
+g.98.NAT$percentile<-ceiling(100*ewcdf(GIC.98$Adj_conspc,w=GIC.98$Nweight)
+               (GIC.98$Adj_conspc))
+
+g.98.nat<-g.98.NAT %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_98_nat=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_98_nat)
+  
+  
+g.08.NAT<-GIC.08 %>%mutate(Nweight=weight*hhsize)
+g.08.NAT$percentile<-ceiling(100*ewcdf(GIC.08$Adj_conspc,w=GIC.08$Nweight)
+               (GIC.08$Adj_conspc))
+
+g.08.nat<-g.08.NAT %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_08_nat=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_08_nat) 
+
+g.08.nat<-g.08.nat[-c(101,100,99),] %>%
+   add_row( cum_08_nat = 0.9204422051)%>%
+  add_row( cum_08_nat = 1.00)
+  
+
+L.nat<-cbind(g.87.nat,g.98.nat,g.08.nat) %>% mutate(norm=seq(0.01,1,0.01)) %>%
+  mutate(percentile=percentile/100) 
+
+
+
+```
+
+
+
+
+
+
+
+```{r,include=F}
+`Income percentiles`<-seq(0.01,1,0.01)
+w.s<-ggplot(L.s,aes(percentile))+
+  geom_line(aes(y=cum_87_s,color="1987")) +
+  geom_line(aes(y=cum_98_s,color="1998"))+
+  geom_line(aes(y=cum_08_s,color="2008"))+
+  geom_line(aes(y=norm,color="45 degree line"))+
+  ggtitle(label = "Lorenz Curve Cote d'Ivoire (South region)",
+              subtitle = "1987-1998-2008")+
+theme(
+  plot.title = element_text(hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)+labs(x = " Cumulative share of population in percentiles",
+         y = "Cumulative share of consumption per capita in percentiles",
+         color = "Legend") 
+
+
+
+w.n<-ggplot(L.n,aes(percentile))+
+  geom_line(aes(y=`cum_87_n`,color="1987")) +
+  geom_line(aes(y=`cum_98_n`,color="1998"))+
+  geom_line(aes(y=cum_08_n,color="2008"))+
+  geom_line(aes(y=norm,color="45 degree line"))+
+  ggtitle(label = "Lorenz Curve Cote d'Ivoire (North region)",
+              subtitle = "1987-1998-2008")+
+theme(
+  plot.title = element_text(hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)+labs(x = "Cumulative share of population in percentiles",
+         y = "Cumulative share of consumption per capita in percentiles",
+         color = "Legend") 
+
+
+
+
+w.nat<-ggplot(L.nat,aes(percentile))+
+  geom_line(aes(y=cum_87_nat,color="1987")) +
+  geom_line(aes(y=cum_98_nat,color="1998"))+
+  geom_line(aes(y=cum_08_nat,color="2008"))+
+  geom_line(aes(y=norm,color="45 degree line"))+
+  ggtitle(label = "Lorenz Curve Cote d'Ivoire (National Level)",
+              subtitle = "1987-1998-2008")+
+theme(
+  plot.title = element_text(hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)+labs(x = " Cumulative share of population in percentiles",
+         y = "Cumulative share of consumption per capita in percentiles",
+         color = "Legend") 
+```
+
+```{r,echo=F,fig.show="hold",out.width="50%"}
+w.s
+w.n
+w.nat
+
+
+
+
+```
+
+### (b)
+ Looking at the Lorenz curve on the National level, we notice that there exist quite significant levels of consumption inequality in the Ivory Coast. Indeed, all three curves are not on the 45 degree line meaning that each percentile of the population does not have its percentiles worth in consumption per capita. Furthermore, the curves seem to be quite far from the 45 degree line meaning high levels of inequality. For example in 2008, the top 10% of the population represented around than than 38% of the total consumption per capita.
+
+On the regional levels, we  notice that inequality seems to be slightly higher in the south than in the North.
+ 
+ We also notice, a  slight reduction of inequality between 1987 and 1998 on the national level. It is fair to attribute that reduction of inequality to the Northern region where inequalities seem to have significantly decreased for all percentiles between the two periods, whereas for the Southern region the decrease in inequality seems to have happened only after the 70th percentile .
+ 
+ However,between 1998 and 2008, inequality seems to have increased past 1987 level for all regions. This is consistent with the growth incidence curve computed above.
+ 
+ 
+
+
+
+
+\pagebreak
+
+
+
+
+
+# R CODE
+
+### (c)
+
+```{r,include=T, eval=F}
+library(haven)
+library(broom)
+library(kableExtra)
+library(tidyverse)
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(pastecs)
+library(Hmisc)
+library(laeken)
+library(psych)
+library(broom)
+library(spatstat.data)
+library(spatstat)
+a<-read_dta("Data/civ_87_08.dta") %>% mutate(individual=1)
+
+a<-a %>% mutate(conspi=constot/hhsize)
+
+
+GIC.a<-a %>% mutate(Nweight=weight*hhsize)
+cdf_a<-ewcdf(GIC.a$conspi,w=a$Nweight)
+ptile.a.1<-tidy(quantile(cdf_a,probs=seq(0.25,1,0.25)))
+
+
+a.87<-a %>% filter(year=="1987")
+ a.87<-a.87%>% mutate(Logcons=log(conspi))%>% 
+  mutate(sd_logcons=sd(Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)%>%
+   mutate(try=conspi*weight)
+
+a.98<-a %>% filter(year=="1998")%>%  mutate(Logcons=log(conspi)) 
+  a.98<-a.98%>% mutate(sd_logcons=sd(a.98$Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+                                  
+a.08<-a %>% filter(year=="2008")%>%  mutate(Logcons=log(conspi))
+  a.08<-a.08%>% mutate(sd_logcons=sd(a.08$Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+
+  
+
+
+hist(a.87$conspi,xlab = "Consumption per capita",
+     main = "Distribution of consumption per capita (1987)",
+     breaks = 500)
+
+hist(a.98$conspi,xlab = "Consumption per capita",
+     main = "Distribution of consumption per capita (1998)",
+     breaks = 500)
+
+hist(a.08$conspi,xlab = "Consumption per capita",
+     main = "Distribution of consumption per capita (2008)",
+     breaks = 500)
+     
+     
+
+
+### (d)
+
+
+
+a.87<-a %>% filter(year=="1987")
+ a.87<-a.87%>% mutate(Logcons=log(conspi))%>% 
+  mutate(sd_logcons=sd(Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+
+a.98<-a %>% filter(year=="1998")%>%  mutate(Logcons=log(conspi)) 
+  a.98<-a.98%>% mutate(sd_logcons=sd(a.98$Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+                                  
+a.08<-a %>% filter(year=="2008")%>%  mutate(Logcons=log(conspi))
+  a.08<-a.08%>% mutate(sd_logcons=sd(a.08$Logcons))%>%
+  mutate(sd_away=(Logcons- median(Logcons))/sd_logcons)%>% 
+  filter(sd_away>=-3) %>% filter (sd_away<=3)
+
+b<-rbind(a.87,a.98,a.08)
+
+
+hist(a.87$Logcons,xlab = "Log of consumption",
+     main = "Histogram of log consumption in 1987",
+     breaks=500)
+
+
+hist(a.98$Logcons,xlab = "Log of consumption",
+     main = "Histogram of log consumption in 1998",
+     breaks = 500)
+
+hist(a.08$Logcons,xlab = "Log of consumption",
+     main = "Histogram of log consumption in 2008",
+     breaks = 500)
+
+
+
+
+## 2. Consumer Price Index and Purchasing Power Parity
+
+### (a)
+
+
+
+
+a.N.87<- a.87 %>% filter(north==1)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight
+  filter(dummy==1)
+
+a.N.98<- a.98 %>% filter(north==1)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight
+  filter(dummy==1)
+
+a.N.08<- a.08 %>% filter(north==1)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight
+  filter(dummy==1)
+
+#filtering north df by year with represnetative
+#Household.
+
+
+fs.1<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Share="Food share")
+fs.1<- fs.1 %>%mutate(`1987`=
+weighted.mean(a.N.87$share_food,a.N.87$Adj_weight))
+fs.1<- fs.1 %>%mutate(`1998`=
+weighted.mean(a.N.98$share_food,a.N.98$Adj_weight))
+fs.1<-fs.1 %>%mutate(`2008`=
+weighted.mean(a.N.08$share_food,a.N.08$Adj_weight))
+# computing food share per year in a new df
+
+fs.2<-a %>% filter(hhid==1020)%>% select(.) %>%
+  mutate(`Share`="Non-food share")
+fs.2<- fs.2 %>%mutate(`1987`=
+weighted.mean(a.N.87$share_nonfood,a.N.87$Adj_weight))
+fs.2<- fs.2 %>%mutate(`1998`=
+weighted.mean(a.N.98$share_nonfood,a.N.98$Adj_weight))
+fs.2<-fs.2 %>%mutate(`2008`=
+weighted.mean(a.N.08$share_nonfood,a.N.08$Adj_weight))
+#computing non food share in a new df
+
+c_sh.nor<-rbind(fs.1,fs.2)
+#merging df for north
+
+
+a.S.87<- a.87 %>% filter(north==0)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight  
+filter(dummy==1)
+
+
+
+a.S.98<- a.98 %>% filter(north==0)%>% 
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight  
+filter(dummy==1)
+
+a.S.08<- a.08 %>% filter(north==0)%>%
+  mutate(dummy=ifelse(hhsize==4 &
+  femalehead==0 &
+    work_farmer==1 & work_selfem==0,1,
+ifelse(hhsize==4 &femalehead==0 &
+  work_farmer==1 & work_selfem==1,1, 
+ifelse(hhsize==4 &
+femalehead==0 & work_farmer==0 & 
+  work_selfem==1,1,0)))) %>%
+  #create a dummy telling us representative
+#household.
+  mutate(share_food=exp_food/constot) %>%
+  mutate(share_nonfood=1-share_food) %>%
+#created a variable that is the share
+#of food and non food in consumption
+mutate(Adj_weight= weight*conspc*hhsize)%>%
+  #creating new weight  
+filter(dummy==1)
+
+fs.3<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Share="Food share")
+fs.3<- fs.3 %>%mutate(`1987`=
+weighted.mean(a.S.87$share_food,a.S.87$Adj_weight))
+fs.3<- fs.3 %>%mutate(`1998`=
+weighted.mean(a.S.98$share_food,a.S.98$Adj_weight))
+fs.3<-fs.3 %>%mutate(`2008`=
+weighted.mean(a.S.08$share_food,a.S.08$Adj_weight))
+# computing food share per year in a new df
+
+fs.4<-a %>% filter(hhid==1020)%>% select(.) %>%
+  mutate(`Share`="Non-food share")
+fs.4<- fs.4 %>%mutate(`1987`=
+weighted.mean(a.S.87$share_nonfood,a.S.87$Adj_weight))
+fs.4<- fs.4 %>%mutate(`1998`=
+weighted.mean(a.S.98$share_nonfood,a.S.98$Adj_weight))
+fs.4<-fs.4 %>%mutate(`2008`=
+weighted.mean(a.S.08$share_nonfood,a.S.08$Adj_weight))
+#computing non food share in a new df
+
+c_sh.sou<-rbind(fs.3,fs.4)
+#creating df for north
+
+#created data set with only representative HH.
+#summed total income and computed the shares
+#used HH weights
+
+C.sha<-rbind(c_sh.nor,c_sh.sou)
+
+
+kable(C.sha,caption="Average
+      budget shares of the representative Household",
+      col.names=c("Budget share","1987","1998","2008"),
+      align=c("l","c","c","c"),
+      digits=4,booktab=T)%>%
+  pack_rows("Northern Region",1,2)%>%
+  pack_rows("Southern Region",3,4)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+
+
+
+
+
+
+### (b)
+
+b.N.87<-a.87 %>% filter(north==1) %>%mutate(individual=1)
+b.N.98<-a.98 %>% filter(north==1)%>%mutate(individual=1)
+b.N.08<-a.08 %>% filter(north==1)%>%mutate(individual=1)
+
+b.S.87<-a.87 %>% filter(north==0)%>%mutate(individual=1)
+b.S.98<-a.98 %>% filter(north==0)%>%mutate(individual=1)
+b.S.08<-a.08 %>% filter(north==0)%>%mutate(individual=1)
+
+
+
+#method2
+# in this method we use the budget share
+#variables and we use the average prices
+#as the prices and the budget shares
+#act like 2 goods
+
+
+#created a df with just variables needed
+# we do this for all years in the north
+# then the south
+#converted budget shares into decimales
+#or else index is above 1
+
+las.2.87.n<-b.N.87 %>%filter(hhid=="26002")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.N.87$individual))
+
+
+las.2.98.n<-b.N.98 %>%filter(hhid=="54001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.N.98$individual))
+
+las.2.08.n<-b.N.08 %>%filter(hhid=="157001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.N.08$individual))
+
+
+#create a df with laspeyres indices for 
+# every period referencing to the 
+# dataframes that we previously created
+LAS.m2.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="North") %>%
+  mutate(`1987`=
+(las.2.87.n$avprice_food/
+   las.2.87.n$avprice_food)*las.2.87.n$bdgshr_food + 
+(las.2.87.n$avprice_othr/
+   las.2.87.n$avprice_othr)*las.2.87.n$bdgshr_othr)%>%
+ mutate(`1998`=
+(las.2.98.n$avprice_food/
+   las.2.87.n$avprice_food)*las.2.87.n$bdgshr_food + 
+(las.2.98.n$avprice_othr/
+   las.2.87.n$avprice_othr)*las.2.87.n$bdgshr_othr)%>%
+mutate(`2008`=
+(las.2.08.n$avprice_food/
+   las.2.87.n$avprice_food)*
+  las.2.87.n$bdgshr_food + 
+(las.2.08.n$avprice_othr/
+   las.2.87.n$avprice_othr)*las.2.87.n$bdgshr_othr)
+
+Obs.n<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations (N)")%>%mutate(`1987`=sum(las.2.87.n$Observations))%>%
+  mutate(`1998`=sum(las.2.98.n$Observations))%>%
+  mutate(`2008`=sum(sum(las.2.08.n$Observations)))
+
+
+
+# we do exact same thing for the south
+las.2.87.s<-b.S.87 %>%filter(hhid=="6001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.S.87$individual))
+
+las.2.98.s<-b.S.98 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.S.98$individual))
+
+las.2.08.s<-b.S.08 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)%>%
+  mutate(Observations=sum(b.N.08$individual))
+
+LAS.m2.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="South") %>%
+  mutate(`1987`=
+(las.2.87.s$avprice_food/
+   las.2.87.s$avprice_food)*
+  las.2.87.s$bdgshr_food + 
+(las.2.87.s$avprice_othr/
+   las.2.87.s$avprice_othr)*
+  las.2.87.s$bdgshr_othr)%>%
+ mutate(`1998`=(las.2.98.s$avprice_food/
+  las.2.87.s$avprice_food)*
+    las.2.87.s$bdgshr_food + 
+(las.2.98.s$avprice_othr/
+   las.2.87.s$avprice_othr)*
+  las.2.87.s$bdgshr_othr)%>%
+mutate(`2008`=(las.2.08.s$avprice_food/
+     las.2.87.s$avprice_food)*
+         las.2.87.s$bdgshr_food + 
+(las.2.08.s$avprice_othr/
+   las.2.87.s$avprice_othr)*las.2.87.s$bdgshr_othr)
+
+Obs.s<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations (S)")%>%mutate(`1987`=sum(las.2.87.s$Observations))%>%
+  mutate(`1998`=sum(las.2.98.s$Observations))%>%
+  mutate(`2008`=sum(sum(las.2.08.s$Observations)))
+#Las.0<-rbind(LAS.m2.N,LAS.m2.S)
+#Las.1<-rbind(Obs.n,Obs.s)
+
+#we combine the north and south df
+# to have indices for North and 
+#south in a single df
+LAS.m2<-rbind(LAS.m2.N,LAS.m2.S)
+  
+
+
+pas.87.n<-b.N.87 %>%filter(hhid=="26002")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr,individual)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.98.n<-b.N.98 %>%filter(hhid=="54001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr,individual)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+pas.08.n<-b.N.08 %>%filter(hhid=="157001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr,individual)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+
+#create a df with laspeyres indices for 
+# every period referencing to the 
+# dataframes that we previously created
+
+PAS.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="North") %>%
+  mutate(`1987`=
+1/((pas.87.n$avprice_food/
+   pas.87.n$avprice_food)*pas.87.n$bdgshr_food + 
+(pas.87.n$avprice_othr/
+   pas.87.n$avprice_othr)*pas.87.n$bdgshr_othr))%>%
+ mutate(`1998`=
+1/((pas.87.n$avprice_food/
+   pas.98.n$avprice_food)*pas.98.n$bdgshr_food + 
+(pas.87.n$avprice_othr/
+   pas.98.n$avprice_othr)*pas.98.n$bdgshr_othr))%>%
+mutate(`2008`=
+1/((pas.87.n$avprice_food/
+   pas.08.n$avprice_food)*
+  pas.08.n$bdgshr_food + 
+(pas.87.n$avprice_othr/
+   pas.08.n$avprice_othr)*pas.08.n$bdgshr_othr))
+
+
+
+# we do exact same thing for the south
+pas.87.s<-b.S.87 %>%filter(hhid=="6001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.98.s<-b.S.98 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+pas.08.s<-b.S.08 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+PAS.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="South") %>%
+  mutate(`1987`=
+(1/(pas.87.s$avprice_food/
+   pas.87.s$avprice_food)*
+  pas.87.s$bdgshr_food + 
+(pas.87.s$avprice_othr/
+   pas.87.s$avprice_othr)*
+  pas.87.s$bdgshr_othr))%>%
+ mutate(`1998`=1/((pas.87.s$avprice_food/
+  pas.98.s$avprice_food)*
+    pas.98.s$bdgshr_food + 
+(pas.87.s$avprice_othr/
+   pas.98.s$avprice_othr)*
+  pas.98.s$bdgshr_othr))%>%
+mutate(`2008`=1/((pas.87.s$avprice_food/
+     pas.08.s$avprice_food)*
+         pas.08.s$bdgshr_food + 
+(pas.87.s$avprice_othr/
+   pas.08.s$avprice_othr)*pas.08.s$bdgshr_othr))
+#Pas.0<-rbind(PAS.N,PAS.S)
+#Pas.1<-rbind(Obs.n,Obs.s)
+#we combine the north and south df
+# to have indices for North and 
+#south in a single df
+PAS<-rbind(PAS.N,PAS.S)
+  
+CPI<-rbind(LAS.m2,PAS)
+
+
+kable(CPI,caption="CPI measures for the years 1987-1998-2008",col.names=c("Index","1987","1998","2008"),
+      align=c("l","c","c","c"),digits=4,booktab=T)%>%kable_styling()%>%
+  pack_rows("Laspeyres",1,2) %>%
+  pack_rows("Paasche",3,4)%>%
+  kable_styling(latex_options = "HOLD_position")%>%
+  add_footnote("Base is 1 not 100")
+
+
+
+### (c)
+
+
+#we are going to use the same
+#code as before but we are going
+# to use the south as base reference
+#meaning that every time we used 1987
+#as base, we'll change that to the
+#same year but for the south
+
+las.2.87.n<-b.N.87 %>%filter(hhid=="26002")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+las.2.98.n<-b.N.98 %>%filter(hhid=="54001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+las.2.08.n<-b.N.08 %>%filter(hhid=="157001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+las.2.87.s<-b.S.87 %>%filter(hhid=="6001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+las.2.98.s<-b.S.98 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+las.2.08.s<-b.S.08 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+
+LAS.N.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Laspeyres") %>%
+  mutate(`1987`=
+(las.2.87.n$avprice_food/
+   las.2.87.s$avprice_food)*las.2.87.s$bdgshr_food + 
+(las.2.87.n$avprice_othr/
+   las.2.87.s$avprice_othr)*las.2.87.s$bdgshr_othr)%>%
+ mutate(`1998`=
+(las.2.98.n$avprice_food/
+   las.2.98.s$avprice_food)*las.2.98.s$bdgshr_food + 
+(las.2.98.n$avprice_othr/
+   las.2.98.s$avprice_othr)*las.2.98.s$bdgshr_othr)%>%
+mutate(`2008`=
+(las.2.08.n$avprice_food/
+   las.2.08.s$avprice_food)*
+  las.2.08.s$bdgshr_food + 
+(las.2.08.n$avprice_othr/
+   las.2.08.s$avprice_othr)*las.2.08.s$bdgshr_othr)
+
+
+
+pas.87.n<-b.N.87 %>%filter(hhid=="26002")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.98.n<-b.N.98 %>%filter(hhid=="54001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+pas.08.n<-b.N.08 %>%filter(hhid=="157001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.87.s<-b.S.87 %>%filter(hhid=="6001")%>%
+  select(bdgshr_food,bdgshr_othr,avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+pas.98.s<-b.S.98 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+pas.08.s<-b.S.08 %>%filter(hhid=="1001")%>%
+  select(bdgshr_food,bdgshr_othr,
+         avprice_food,avprice_othr)%>%
+  mutate(bdgshr_food=bdgshr_food/100)%>%
+  mutate(bdgshr_othr=bdgshr_othr/100)
+
+
+#we do the same thing for paasch
+PAS.N.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Paasche") %>%
+  mutate(`1987`=
+1/((pas.87.s$avprice_food/
+   pas.87.n$avprice_food)*pas.87.n$bdgshr_food + 
+(pas.87.s$avprice_othr/
+   pas.87.n$avprice_othr)*pas.87.n$bdgshr_othr))%>%
+ mutate(`1998`=
+1/((pas.98.s$avprice_food/
+   pas.98.n$avprice_food)*pas.98.n$bdgshr_food + 
+(pas.98.s$avprice_othr/
+   pas.98.n$avprice_othr)*pas.98.n$bdgshr_othr))%>%
+mutate(`2008`=
+1/((pas.08.s$avprice_food/
+   pas.08.n$avprice_food)*
+  pas.08.n$bdgshr_food + 
+(pas.08.s$avprice_othr/
+   pas.08.n$avprice_othr)*pas.08.n$bdgshr_othr))
+
+#we create the fisher index with our indices
+#computed above, the product of 
+# the square root of both index
+FIS.N.S<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Fisher") %>% 
+  mutate(`1987`=sqrt(PAS.N.S$`1987`)*sqrt(LAS.N.S$`1987`))%>%
+  mutate(`1998`=sqrt(PAS.N.S$`1998`)*sqrt(LAS.N.S$`1998`))%>%
+  mutate(`2008`=sqrt(PAS.N.S$`2008`)*sqrt(LAS.N.S$`2008`))
+
+
+IND<-rbind(LAS.N.S,PAS.N.S,FIS.N.S)
+
+#IND<-rbind(I,Obs.n)
+
+
+
+kable(IND,caption="PPP measures for the years
+      1987-1998-2008 for the North",
+      col.names=c("Index","1987","1998","2008"),
+      align=c("l","c","c","c"),
+      digits=4,booktab=T)%>%
+  kable_styling(latex_options = "HOLD_position")%>%
+  add_footnote("Base is 1 not 100")
+
+  
+
+
+
+
+
+
+### (d)
+
+b.N.87<-a.87 %>% filter(north==1)
+b.N.98<-a.98 %>% filter(north==1)
+b.N.08<-a.08 %>% filter(north==1)
+
+b.S.87<-a.87 %>% filter(north==0)
+b.S.98<-a.98 %>% filter(north==0)
+b.S.08<-a.08 %>% filter(north==0)
+
+
+d.N.87<-b.N.87 %>% mutate(Adj_conspc=conspc/(ppp/100))%>%
+  mutate(Adj_conspc=Adj_conspc/(cpi/100))
+d.N.98<-b.N.98 %>% mutate(Adj_conspc=conspc/(ppp/100))%>% 
+  mutate(Adj_conspc=Adj_conspc/(192.45/100))
+d.N.08<-b.N.08 %>% mutate(Adj_conspc=conspc/(ppp/100))%>% 
+  mutate(Adj_conspc=Adj_conspc/(255.73/100))
+
+d.S.87<-b.S.87 %>% mutate(Adj_conspc=conspc/(ppp/100))%>%
+  mutate(Adj_conspc=Adj_conspc/(cpi/100))
+d.S.98<-b.S.98 %>% mutate(Adj_conspc=conspc/(ppp/100))%>% 
+  mutate(Adj_conspc=Adj_conspc/(cpi/100))
+d.S.08<-b.S.08 %>% mutate(Adj_conspc=conspc/(ppp/100))%>%
+  mutate(Adj_conspc=Adj_conspc/(cpi/100))
+  
+#here adjusted consumption based on purchasing power
+#we divided it by the PPP index to have the real
+#purchasing power
+
+#we then adjusted the food price for inflation of the
+#south. We first took away the inflation of the north
+#by dividing the avgprice_north then we
+#multiplied it by the price index of the south
+
+# NOTE : could probably compute it yourself
+#by using the numerical value of the avprice
+# of 1987 then just multipliying by south
+#cpi
+
+
+
+d.87.N.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1987-")%>%mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.87$conspc))
+
+d.87.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1987-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.87$conspc))
+
+d.87.A<-rbind(d.87.N.A,d.87.S.A)
+
+
+d.98.N.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1998-")%>%mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.87$Adj_conspc))
+
+d.98.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1998-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.98$conspc))
+
+d.98.A<-rbind(d.98.N.A,d.98.S.A)
+
+
+d.08.N.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(year="-2008-")%>% mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.08$Adj_conspc))
+
+d.08.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-2008-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.08$conspc))
+
+d.08.A<-rbind(d.08.N.A,d.08.S.A)
+
+
+
+
+d.87.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(year="-1987-")%>% mutate(Region="North") %>% 
+   mutate(avg_cpc= mean(d.N.87$conspc))
+
+d.87.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1987-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.87$conspc))
+
+d.87.B<-rbind(d.87.N,d.87.S.A)
+
+d.98.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1998-")%>%mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.98$conspc))
+
+d.98.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-1998-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.98$conspc))
+
+d.98.B<-rbind(d.98.N,d.98.S.A)
+
+
+d.08.N<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-2008-")%>%mutate(Region="North") %>%
+   mutate(avg_cpc= mean(d.N.08$conspc))
+
+
+d.08.S.A<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(year="-2008-")%>%mutate(Region="South") %>%
+   mutate(avg_cpc= mean(b.S.08$conspc))
+
+d.08.B<-rbind(d.08.N,d.08.S.A)
+
+d.Nadj<-rbind(d.87.B,d.98.B,d.08.B)
+
+d.adj<-rbind(d.87.A,d.98.A,d.08.A)
+
+Tab<-rbind(d.Nadj,d.adj)
+
+
+
+
+kable(Tab,caption=" Average consumption per capita made comparable
+      between North and South",col.names=c("Year","Region", 
+          "Average consumption per capita"),align=c("l","c","c"),
+      digits=2,booktab=T)%>%kable_styling()%>%
+  kable_styling(latex_options = "HOLD_position")%>%
+  pack_rows("Without adjustement",1,6)%>%
+  pack_rows("With adjustement",7,12)
+
+
+## 3. Absolute measure of poverty
+### (a)
+
+#creating a dummy which is 1 when HH's consumption
+#is under 237. Also creating a variable individual
+#which is equal to 1 for every observation
+
+
+#filtering by year and by region by using previous DF
+# Creating an additional one for national level.
+e.87.N<-d.N.87 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.98.N<-d.N.98 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.08.N<-d.N.08 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+
+e.87.S<-d.S.87 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.98.S<-d.S.98 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.08.S<-d.S.08 %>% 
+  mutate(Poor=ifelse(Adj_conspc<237,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+
+e.87.NAT<-rbind(e.87.N,e.87.S)
+e.98.NAT<-rbind(e.98.N,e.98.S)
+e.08.NAT<-rbind(e.08.N,e.08.S)
+
+#creating blank df for each year and level of 
+#analysis. Theyll contain the poverty rate
+# computing by using the dfs above. 
+e.87.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%
+  mutate(Povrate_87=sum(e.87.N$Poor*e.87.N$Nweight)/
+           sum(e.87.N$individual*e.87.N$Nweight))
+
+
+
+#create a df for the number of obervation, the rbinding
+#them with the corresponding df by year then by  by
+#cbinding them to have a complete data frame
+
+Obs.e.87.n<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations")%>%mutate(Povrate_87=396)
+
+e.87.Np<-rbind(e.87.Np,Obs.e.87.n)
+
+# for south 87
+e.87.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=sum(e.87.S$Poor*e.87.S$Nweight)/
+    sum(e.87.S$individual*e.87.S$Nweight))
+
+Obs.e.87.s<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations")%>%
+  mutate(Povrate_87=1188)
+
+e.87.Sp<-rbind(e.87.Sp,Obs.e.87.s)
+
+#for national level 87
+e.87.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%
+  mutate(Povrate_87=sum(e.87.NAT$Poor*e.87.NAT$Nweight)/
+                sum(e.87.NAT$individual*e.87.N$Nweight))
+
+Obs.e.87.nat<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="Observations")%>%
+  mutate(Povrate_87=sum(a.87$individual))
+
+e.87.Natp<-rbind(e.87.Natp,Obs.e.87.nat)
+
+#rbinding the 1987 df
+Obs.87<-cbind(Obs.e.87.n,Obs.e.87.s,Obs.e.87.nat)
+Poor.87<-rbind(e.87.Np,e.87.Sp,e.87.Natp)
+
+
+#for north 98
+e.98.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+   mutate(Povrate_98=sum(e.98.N$Poor*e.98.N$Nweight)/
+          sum(e.98.N$individual*e.98.N$Nweight))
+
+Obs.e.98.n<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=969)
+
+e.98.Np<-rbind(e.98.Np,Obs.e.98.n)
+
+#for south 98
+e.98.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=sum(e.98.S$Poor*e.98.S$Nweight)/
+          sum(e.98.S$individual*e.98.S$Nweight))
+
+Obs.e.98.s<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=3182)
+
+e.98.Sp<-rbind(e.98.Sp,Obs.e.98.s)
+
+#for national 98
+e.98.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+   mutate(Povrate_98=sum(e.98.NAT$Poor*e.98.NAT$Nweight)/
+           sum(e.98.NAT$individual*e.98.NAT$Nweight))
+
+Obs.e.98.nat<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=sum(a.98$individual))
+
+e.98.Natp<-rbind(e.98.Natp,Obs.e.98.nat)
+
+#rbinding the 1998 df
+
+Poor.98<-rbind(e.98.Np,e.98.Sp,e.98.Natp)
+
+
+#For 2008 north
+e.08.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+   mutate(Povrate_08=sum(e.08.N$Poor*e.08.N$Nweight)/
+           sum(e.08.N$individual*e.08.N$Nweight))
+
+Obs.e.08.n<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=3597)
+
+e.08.Np<-rbind(e.08.Np,Obs.e.08.n)
+
+
+#for 2008 south
+e.08.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+mutate(Povrate_08=sum(e.08.S$Poor*e.08.S$Nweight)/
+          sum(e.08.S$individual*e.08.S$Nweight))
+
+Obs.e.08.s<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=3597)
+
+e.08.Sp<-rbind(e.08.Sp,Obs.e.08.s)
+
+#for 2008 national
+e.08.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=sum(e.08.NAT$Poor*e.08.NAT$Nweight)/
+          sum(e.08.NAT$individual*e.08.NAT$Nweight))
+
+Obs.e.08.nat<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=sum(a.08$individual))
+
+e.08.Natp<-rbind(e.08.Natp,Obs.e.08.nat)
+
+#rbinding the 2008 df
+Poor.08<-rbind(e.08.Np,e.08.Sp,e.08.Natp)
+
+
+
+
+Poor<-cbind(Poor.87,Poor.98,Poor.08)
+ 
+
+
+
+
+kable(Poor,caption="Poverty rates in 1987-1998-2008 
+      on different geographical levels",col.names=c("Level","1987",
+  "1998","2008"),
+      align=c("l","c","c","c"),
+      digits=3,booktab=T)%>%kable_styling()%>%
+  pack_rows("North",1,2)%>%
+  pack_rows("South",3,4)%>%
+   pack_rows("National",5,5)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+
+
+
+### (b)
+
+e.87.N<-d.N.87 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.98.N<-d.N.98 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.08.N<-d.N.08 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+
+e.87.S<-d.S.87 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.98.S<-d.S.98 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+e.08.S<-d.S.08 %>% 
+  mutate(Poor=ifelse(Adj_conspc<474,1,0))%>%
+  mutate(Nweight=hhsize*weight)%>%mutate(individual=1)
+
+e.87.NAT<-rbind(e.87.N,e.87.S)
+e.98.NAT<-rbind(e.98.N,e.98.S)
+e.08.NAT<-rbind(e.08.N,e.08.S)
+
+e.87.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%
+  mutate(Povrate_87=sum(e.87.N$Poor*e.87.N$Nweight)/
+                sum(e.87.N$individual*e.87.N$Nweight))
+
+e.87.Np<-rbind(e.87.Np,Obs.e.87.n)
+
+e.87.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=sum(e.87.S$Poor*e.87.S$Nweight)/
+           sum(e.87.S$individual*e.87.S$Nweight))
+
+e.87.Sp<-rbind(e.87.Sp,Obs.e.87.s)
+
+e.87.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%
+  mutate(Povrate_87=sum(e.87.NAT$Poor*e.87.NAT$Nweight)/
+           sum(e.87.NAT$individual*e.87.N$Nweight))
+
+e.87.Natp<-rbind(e.87.Natp,Obs.e.87.nat)
+
+Poor.87.1<-rbind(e.87.Np,e.87.Sp,e.87.Natp)
+
+
+e.98.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=sum(e.98.N$Poor*e.98.N$Nweight)/ 
+          sum(e.98.N$individual*e.98.N$Nweight))
+
+
+e.98.Np<-rbind(e.98.Np,Obs.e.98.n)
+
+
+e.98.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=sum(e.98.S$Poor*e.98.S$Nweight)/
+          sum(e.98.S$individual*e.98.S$Nweight))
+
+
+e.98.Sp<-rbind(e.98.Sp,Obs.e.98.s)
+
+e.98.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=sum(e.98.NAT$Poor*e.98.NAT$Nweight)/
+           sum(e.98.NAT$individual*e.98.NAT$Nweight))
+
+e.98.Natp<-rbind(e.98.Natp,Obs.e.98.nat)
+
+
+Poor.98.1<-rbind(e.98.Np,e.98.Sp,e.98.Natp)
+
+e.08.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=sum(e.08.N$Poor*e.08.N$Nweight)/
+           sum(e.08.N$individual*e.08.N$Nweight))
+
+e.08.Np<-rbind(e.08.Np,Obs.e.08.n)
+
+
+
+e.08.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=sum(e.08.S$Poor*e.08.S$Nweight)/
+          sum(e.08.S$individual*e.08.S$Nweight))
+
+e.08.Sp<-rbind(e.08.Sp,Obs.e.08.s)
+
+e.08.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=sum(e.08.NAT$Poor*e.08.NAT$Nweight)/
+          sum(e.08.NAT$individual*e.08.NAT$Nweight))
+
+e.08.Natp<-rbind(e.08.Natp,Obs.e.08.nat)
+
+Poor.08.1<-rbind(e.08.Np,e.08.Sp,e.08.Natp)
+
+Poor.1<-cbind(Poor.87.1,Poor.98.1,Poor.08.1)
+
+kable(Poor.1,caption="Poverty rates in
+      1987-1998-2008 on different geographical levels",
+      col.names=c("Level","1987",
+  "1998","2008"),
+      align=c("l","c","c","c"),
+      digits=3,booktab=T)%>%kable_styling()%>%
+  pack_rows("North",1,2)%>%
+  pack_rows("South",3,4)%>%
+   pack_rows("National",5,6)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+
+
+
+
+
+### (c)
+
+
+f.87.N<-e.87.N %>% mutate(Ncpi=100) %>%
+  mutate(newconspc_87=conspc/(100/100))%>%
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.98.N<-e.98.N%>% mutate(Ncpi=192.42)%>%
+  mutate(newconspc_87=conspc/(100/100))%>%
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.08.N<-e.08.N%>% mutate(Ncpi=255.73)%>%
+  mutate(newconspc_87=conspc/(100/100))%>% 
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.87.S<-e.87.S %>% mutate(Ncpi=100) %>%
+  mutate(newconspc_87=conspc/(100/100))%>%
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.98.S<-e.98.S%>% mutate(Ncpi=192.42)%>%
+  mutate(newconspc_87=conspc/(100/100))%>%
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.08.S<-e.08.S%>% mutate(Ncpi=255.73)%>%
+  mutate(newconspc_87=conspc/(100/100))%>% 
+  mutate(newconspc_87=newconspc_87/(Ncpi/100))%>%
+   mutate(Poor=ifelse(newconspc_87<237,1,0))
+
+f.87.NAT<-rbind(f.87.N,f.87.S)
+f.98.NAT<-rbind(f.98.N,f.98.S)
+f.08.NAT<-rbind(f.08.N,f.08.S)
+
+f.87.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=
+                weighted.mean(f.87.N$Poor,f.87.N$Nweight))
+f.87.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=
+            weighted.mean(f.87.S$Poor,f.87.S$Nweight))
+f.87.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Region="")%>%mutate(Povrate_87=
+                weighted.mean(f.87.NAT$Poor,f.87.NAT$Nweight))
+
+f.87.Np<-rbind(f.87.Np,Obs.e.87.n)
+f.87.Sp<-rbind(f.87.Sp,Obs.e.87.s)
+f.87.Natp<-rbind(f.87.Np,Obs.e.87.nat)
+Poor.87.2<-rbind(f.87.Np,f.87.Sp,f.87.Natp)
+
+f.98.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=weighted.mean(f.98.N$Poor,f.98.N$Nweight))
+f.98.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_98=weighted.mean(f.98.S$Poor,f.98.S$Nweight))
+f.98.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_98=weighted.mean(f.98.NAT$Poor,f.98.NAT$Nweight))
+
+
+f.98.Np<-rbind(f.98.Np,Obs.e.98.n)
+f.98.Sp<-rbind(f.98.Sp,Obs.e.98.s)
+f.98.Natp<-rbind(f.98.Np,Obs.e.98.nat)
+Poor.98.2<-rbind(f.98.Np,f.98.Sp,f.98.Natp)
+
+f.08.Np<-a %>% filter(hhid==1020)%>% select(.) %>% 
+  mutate(Povrate_08=weighted.mean(f.08.N$Poor,f.08.N$Nweight))
+f.08.Sp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=weighted.mean(f.08.S$Poor,f.08.S$Nweight))
+f.08.Natp<-a %>% filter(hhid==1020)%>% select(.) %>% 
+ mutate(Povrate_08=weighted.mean(f.08.NAT$Poor,f.08.NAT$Nweight))
+
+
+f.08.Np<-rbind(f.08.Np,Obs.e.08.n)
+f.08.Sp<-rbind(f.08.Sp,Obs.e.08.s)
+f.08.Natp<-rbind(f.08.Np,Obs.e.08.nat)
+Poor.08.2<-rbind(f.08.Np,f.08.Sp,f.08.Natp)
+
+Poor.2<-cbind(Poor.87.2,Poor.98.2,Poor.08.2)
+
+
+kable(Poor.2,caption="Poverty rates in
+      1987-1998-2008 on different geographical 
+      levels assuming prices and preferences
+      are the same",
+      col.names=c("Level","1987",
+  "1998","2008"),
+      align=c("l","c","c","c"),
+      digits=3,booktab=T)%>%kable_styling()%>%
+  pack_rows("North",1,2)%>%
+  pack_rows("South",3,4)%>%
+   pack_rows("National",5,6)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+
+## 4. Growth incidence curves
+
+### (a)
+
+GIC.87<-rbind(d.N.87,d.S.87) %>%
+  mutate(Nweight=weight*hhsize)
+GIC.98<-rbind(d.N.98,d.S.98)%>% 
+  mutate(Nweight=weight*hhsize)
+GIC.08<-rbind(d.N.08,d.S.08)%>% 
+  mutate(Nweight=weight*hhsize)
+
+#computing weighted cumulative distribution
+#of consumpyion per capita
+cdf_87<-ewcdf(GIC.87$Adj_conspc,w=GIC.87$Nweight)
+cdf_98<-ewcdf(GIC.98$Adj_conspc,w=GIC.98$Nweight)
+cdf_08<-ewcdf(GIC.08$Adj_conspc,w=GIC.08$Nweight)
+
+
+#computing percentile for each year.
+ptile.87<-quantile(cdf_87,probs=seq(0.01,1,0.01))
+ptile.98<-quantile(cdf_98,probs=seq(0.01,1,0.01))
+ptile.08<-quantile(cdf_08,probs=seq(0.01,1,0.01))
+
+
+
+```{r,include=F}
+g.87<-tidy((ptile.98-ptile.87)/ptile.87) 
+g.98<-tidy((ptile.08-ptile.98)/ptile.98)
+
+
+
+## #(c)
+
+
+
+library(pracma)
+colors <- c("1987-1998" = "blue", "1998-2008" = "green")
+
+curve.1<-tidy(ptile.87)%>%
+  mutate(`1987-1998`=(ptile.98/ptile.87)) %>% 
+  mutate(py87.98=nthroot(`1987-1998`,11)) %>%mutate(py87.98=py87.98-1)
+
+curve.2<-tidy(ptile.98)%>%
+  mutate(`1998-2008`=(ptile.08/ptile.98)) %>%
+  mutate(py98.08=nthroot(`1998-2008`,10))%>%
+  mutate(py98.08=py98.08-1)%>%
+  rename(namez=names)%>%  
+  rename(z=x) %>% select(`1998-2008`,py98.08)
+curves<-cbind(curve.1,curve.2)
+
+`Income percentiles`<-seq(0.01,1,0.01)
+
+c<-ggplot(curves,aes(`Income percentiles`))+
+  geom_line(aes(y=`py87.98`,color="1987-1998")) +
+  geom_line(aes(y=`py98.08`,color="1998-2008"))+
+  ggtitle(label = "Growth incidence curve Cote d'Ivoire",
+              subtitle = "For the years 1987-1998 and 1998-2008")+
+theme(
+  plot.title = element_text(hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)+
+labs(x = "Income percentiles",
+         y = "% Growth",
+         color = "Legend") +
+    scale_color_manual(values = colors)
+
+
+c+theme_bw()
+
+
+
+
+## Part 5 : Lorenz Curves
+
+#need to create df for north,south
+#and national level.
+#then for each DF, seperate per year.
+#then need to divide by percentile like
+#Q4.a
+
+g.87.N<-d.N.87 %>%mutate(Nweight=weight*hhsize) 
+g.87.N$percentile<-ceiling(100*ewcdf(g.87.N$Adj_conspc,w=g.87.N$Nweight)
+               (g.87.N$Adj_conspc)) 
+
+g.87.n<-g.87.N %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_87_n=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(percentile,cum_87_n) %>%
+  add_row( percentile =22 , cum_87_n = 0.065833273)
+
+g.87.n<-g.87.n[order(g.87.n$cum_87_n),]
+                              
+
+
+g.98.N<-d.N.98 %>%mutate(Nweight=weight*hhsize)
+g.98.N$percentile<-ceiling(100*ewcdf(g.98.N$Adj_conspc,w=g.98.N$Nweight)
+               (g.98.N$Adj_conspc))
+
+g.98.n<-g.98.N %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_98_n=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_98_n)
+  
+  
+g.08.N<-d.N.08 %>%mutate(Nweight=weight*hhsize)
+g.08.N$percentile<-ceiling(100*ewcdf(g.08.N$Adj_conspc,w=g.08.N$Nweight)
+               (g.08.N$Adj_conspc))
+
+g.08.n<-g.08.N %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_08_n=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_08_n)
+
+L.n<-cbind(g.87.n,g.98.n,g.08.n) %>% mutate(norm=seq(0.01,1,0.01)) %>%
+  mutate(percentile=percentile/100)
+
+
+g.87.S<-d.S.87 %>%mutate(Nweight=weight*hhsize) 
+g.87.S$percentile<-ceiling(100*ewcdf(g.87.S$Adj_conspc,w=g.87.S$Nweight)
+               (g.87.S$Adj_conspc)) 
+
+g.87.s<-g.87.S %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_87_s=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(percentile,cum_87_s) 
+                              
+
+
+g.98.S<-d.S.98 %>%mutate(Nweight=weight*hhsize)
+g.98.S$percentile<-ceiling(100*ewcdf(g.98.S$Adj_conspc,w=g.98.S$Nweight)
+               (g.98.S$Adj_conspc))
+
+g.98.s<-g.98.S %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_98_s=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_98_s)
+  
+  
+g.08.S<-d.S.08 %>%mutate(Nweight=weight*hhsize)
+g.08.S$percentile<-ceiling(100*ewcdf(g.08.S$Adj_conspc,w=g.08.S$Nweight)
+               (g.08.S$Adj_conspc))
+
+g.08.s<-g.08.S %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_08_s=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_08_s)
+
+L.s<-cbind(g.87.s,g.98.s,g.08.s) %>% mutate(norm=seq(0.01,1,0.01)) %>%
+  mutate(percentile=percentile/100)
+
+
+
+
+
+
+
+ g.87.NAT<-GIC.87 %>%mutate(Nweight=weight*hhsize) 
+g.87.NAT$percentile<-ceiling(100*ewcdf( g.87.NAT$Adj_conspc,w= g.87.NAT$Nweight)
+               ( g.87.NAT$Adj_conspc)) 
+
+g.87.nat<-g.87.NAT %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_87_nat=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(percentile,cum_87_nat)
+                              
+
+
+g.98.NAT<-GIC.98 %>%mutate(Nweight=weight*hhsize)
+g.98.NAT$percentile<-ceiling(100*ewcdf(GIC.98$Adj_conspc,w=GIC.98$Nweight)
+               (GIC.98$Adj_conspc))
+
+g.98.nat<-g.98.NAT %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_98_nat=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_98_nat)
+  
+  
+g.08.NAT<-GIC.08 %>%mutate(Nweight=weight*hhsize)
+g.08.NAT$percentile<-ceiling(100*ewcdf(GIC.08$Adj_conspc,w=GIC.08$Nweight)
+               (GIC.08$Adj_conspc))
+
+g.08.nat<-g.08.NAT %>%select(Adj_conspc,percentile,Nweight)%>%
+  group_by(percentile) %>%
+summarize_all(funs(sum(Adj_conspc*Nweight)))%>%
+  mutate(cum_08_nat=cumsum(Adj_conspc)/sum(Adj_conspc))%>%
+  select(cum_08_nat) 
+
+g.08.nat<-g.08.nat[-c(101,100,99),] %>%
+   add_row( cum_08_nat = 0.9204422051)%>%
+  add_row( cum_08_nat = 1.00)
+  
+
+L.nat<-cbind(g.87.nat,g.98.nat,g.08.nat) %>% mutate(norm=seq(0.01,1,0.01)) %>%
+  mutate(percentile=percentile/100) 
+
+
+
+`Income percentiles`<-seq(0.01,1,0.01)
+w.s<-ggplot(L.s,aes(percentile))+
+  geom_line(aes(y=cum_87_s,color="1987")) +
+  geom_line(aes(y=cum_98_s,color="1998"))+
+  geom_line(aes(y=cum_08_s,color="2008"))+
+  geom_line(aes(y=norm,color="45 degree line"))+
+  ggtitle(label = "Lorenz Curve Cote d'Ivoire (South region)",
+              subtitle = "1987-1998-2008")+
+theme(
+  plot.title = element_text(hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)+labs(x = " Cumulative share of population in percentiles",
+         y = "Cumulative share of consumption per capita in percentiles",
+         color = "Legend") 
+
+
+
+w.n<-ggplot(L.n,aes(percentile))+
+  geom_line(aes(y=`cum_87_n`,color="1987")) +
+  geom_line(aes(y=`cum_98_n`,color="1998"))+
+  geom_line(aes(y=cum_08_n,color="2008"))+
+  geom_line(aes(y=norm,color="45 degree line"))+
+  ggtitle(label = "Lorenz Curve Cote d'Ivoire (North region)",
+              subtitle = "1987-1998-2008")+
+theme(
+  plot.title = element_text(hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)+labs(x = "Cumulative share of population in percentiles",
+         y = "Cumulative share of 
+       consumption per capita in percentiles",
+         color = "Legend") 
+
+
+
+
+w.nat<-ggplot(L.nat,aes(percentile))+
+  geom_line(aes(y=cum_87_nat,color="1987")) +
+  geom_line(aes(y=cum_98_nat,color="1998"))+
+  geom_line(aes(y=cum_08_nat,color="2008"))+
+  geom_line(aes(y=norm,color="45 degree line"))+
+  ggtitle(label = "Lorenz Curve Cote d'Ivoire (National Level)",
+              subtitle = "1987-1998-2008")+
+theme(
+  plot.title = element_text(hjust = 0.5),
+  plot.subtitle = element_text(hjust = 0.5)
+)+labs(x = " Cumulative share of population in percentiles",
+         y = "Cumulative share of 
+       consumption per capita in percentiles",
+         color = "Legend") 
+
+w.s
+w.n
+w.nat
+
+
+
+
+```
