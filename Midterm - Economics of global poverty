@@ -1,3 +1,5 @@
+*************************** Midterm Do file : Economics of Global Poverty*****************
+
 use "\\tsclient\STATA Folder\CSG_Midterm_2020_Data.dta"
 cd "\\tsclient\STATA Folder"
 reg haz04 treat if group==1|group==2
