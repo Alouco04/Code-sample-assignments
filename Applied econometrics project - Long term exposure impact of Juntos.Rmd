@@ -1,0 +1,552 @@
+---
+title: "Extension code metrics project"
+author: "Alex Vaval"
+date: "3/12/2021"
+output: pdf_document
+---
+
+
+```{r}
+#Goal of code :
+#Calling packages and calling main data
+library(tidyverse)
+library(haven)
+library(plm)
+library(lmtest)
+
+index_sibR1R4_B <- read_dta("~/Desktop/Econometrics project/Replication files/Abdoul/index_sibR1R4_B (1).dta")
+peru_constructed <- read_dta("~/Desktop/Econometrics project/Replication files/Constructed data sets _YL/stata/stata11/peru_constructed.dta")
+```
+
+```{r}
+#Note :`juntos data` set is data set from paper, `constructed data set` is the one from UK data service
+
+df_real<-index_sibR1R4_B%>% filter(sample==1)%>% filter(juntosgroup==1|juntosgroup==3)
+#Objective of code:
+#Find which childid is in both the constructed peru dataset and the one from the study.
+#By doing that we will be able to conduct an analysis on the older child that were present in the paper.
+
+
+peru_clean<-peru_constructed%>%rename(CHILDID=childid) %>% filter(yc==1)
+p<-peru_clean%>% filter(round==2|round==3)%>%select(CHILDID,yc,agemon,juntos)
+#only selecting the younger cohort which has the older siblings and reducing the amount of variable for a clearer picture.
+#we also filter for the rounds because the CHILDIDs appear twice for in the juntos data set
+#filtering for rounds also allow us to compare the age observed to see if the data indeed matches
+
+#UPDATE:replacing authors df by Alessandro's and Ritika
+c<-df_real%>% filter(sib==0) %>%mutate(treated=ifelse(rec_juntos==1,1,ifelse(rec_juntos==2,NA,0)))%>% 
+  select(CHILDID,treated,age_months,sib)
+#we filter for only older siblings.
+#previous text has shown us that the treated individuals are the ones for which this condition holds
+#We create that variable in order to know which ones of the older siblings` childid should be considered
+#the treated group in the control group in the constructed data set.
+#I am not sure what juntos==2 is therefore I set is to 2 so that we can conserve the childID.
+#we can figure out what it means afterwards
+
+ok<-merge(c,p, by="CHILDID", all=TRUE) 
+ok<- ok %>% filter(!is.na(sib))
+#takes out observations that are in constructed but not in juntos data set.
+# By taking out observation that are NA we take out those that are in the constructed data sets but not in juntos.
+
+
+#The final result seems to make sense, the age are similar at the same round.
+#We find that both variables for age_month do not exactly match but that is because of the merge function.
+# If we were to individually select these CHILDIDs in both data sets with just age_month and CHILD variable, we would see that
+# they exactly match.
+#Goal seems to have been achieved!
+
+```
+
+```{r}
+
+#Objective of this code:
+#We want, to only select these child IDs in the constructed one.
+ok_1<-ok %>% select(CHILDID,treated)
+#we only select the two variable of interest and create and new dataframe.
+
+duplicated_df<-left_join(peru_clean,ok_1)
+#we merge the two data sets to only have the same childids
+#there are 5 times the same childid for each round.
+
+#we therefore filter per round, take out the duplicated childIDs and rbind them
+df_1<-duplicated_df %>% filter(round==1) %>% filter(!duplicated(CHILDID))
+df_2<-duplicated_df %>% filter(round==2)%>% filter(!duplicated(CHILDID))
+df_3<-duplicated_df %>% filter(round==3)%>% filter(!duplicated(CHILDID))
+df_4<-duplicated_df %>% filter(round==4)%>% filter(!duplicated(CHILDID))
+df_5<-duplicated_df %>% filter(round==5)%>% filter(!duplicated(CHILDID))
+
+
+
+df_clean<-rbind(df_1,df_2,df_3,df_4,df_5)
+df_clean<- df_clean %>% arrange(df_clean$CHILDID) %>%select(CHILDID,treated,yc:shother)%>%filter(!is.na(treated))
+'This is the data set for the index child of the juntos study with the variables of the peru_constructed data set'
+#we then arrange them to have per childid round 1 through 5 in an ordered manner.
+# we leave out the ones for which treated is NA.
+#We end up with the same number of households(if we consider each child id as a household) as in the juntos data set (843).
+# The objective seems to have been reached!
+
+```
+
+
+
+````{r}
+#In this code chunk we extract the childids present in the authors' sample.
+#We then match them with the childids present in the round 5 survey available for the younger siblings. We obtain a dataset with the subsample with r1-r4 variables.
+#Then we select the child ids and merge them with the round 5 survey available to extract the height for age variable required.
+#In the end, we end up with,the round 5 observations that were present in the previous rounds with an extra column which is sibzhfa extracted from the round 5 survey.
+
+data<-index_sibR1R4_B%>% filter(sample==1)%>% filter(juntosgroup==1|juntosgroup==3)%>%mutate(sibben=sib*rec_juntos)%>% filter(round==1)
+
+id_ys<-pe_r5_ycsib_ycsibling %>%rename(CHILDID=CHILDCODE)%>%select(CHILDID)
+id_ys$CHILDID= paste0("PE",  id_ys$CHILDID)
+
+ys<-data%>% filter(sib==1)
+ys_id<-merge(id_ys,ys,by="CHILDID")
+ ys_id<- ys_id %>% filter(!is.na(sib)) %>% arrange(CHILDID)
+
+ data_ys<-pe_r5_ycsib_ycsibling %>%rename(CHILDID=CHILDCODE)%>% arrange(CHILDID)
+data_ys$CHILDID= paste0("PE",  data_ys$CHILDID)
+ 
+
+data_2<-ys_id%>% select(CHILDID)
+ ys_zhf<-merge(data_2,data_ys)
+ ys_zhf<- ys_zhf %>% arrange(CHILDID)%>%select(sibzhfa)
+ 
+ #younger children only nutritional outcome
+ yes<-cbind(ys_id,ys_zhf)
+ 
+
+ 
+ #This part is for the older siblings where we select the information from round 4 (zhfa) and add it to the information coming from the authors data set
+ data_os<-df_clean%>%filter(round==4)%>%select(zhfa)%>%rename(sibzhfa=zhfa)
+ os<-data%>%filter(sib==0)
+ 
+ yes_1<-cbind(data_os,os)
+ id_of_ys_for_match<-yes %>% select(CHILDID)
+ 
+ id_os_ys_match<-merge(id_of_ys_for_match,yes_1,by="CHILDID")
+
+
+ data_ys_os<-rbind(id_os_ys_match,yes)
+ data_ys_os<-data_ys_os%>%arrange(CHILDID)%>%mutate(Age_n=ifelse(sib==0,age+4,age+3)) %>% 
+   mutate(age_13=ifelse(Age_n==13,1,0))%>% mutate(age_12=ifelse(Age_n==12,1,0))%>% mutate(age_11=ifelse(Age_n==11,1,0))%>%
+   mutate(age_10=ifelse(Age_n==10,1,0))%>% mutate(age_9=ifelse(Age_n==9,1,0))%>% mutate(age_8=ifelse(Age_n==8,1,0))%>%
+   mutate(age_7=ifelse(Age_n==7,1,0))
+ 
+mean(data_ys_os$rec_juntos)
+ mean(data$rec_juntos)
+# ys_id<-merge(id_ys,ys,by="CHILDID")
+
+
+reg_zhfa<-plm(sibzhfa~sib+rec_juntos+sibben+age_11+age_12+age_13+age_10+age_9+age_8+age_7+female+Iybirth_2001+Iybirth_2002+
+                Iybirth_2003+Iybirth_2004+Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+Iybirth_2009+female,data=data_ys_os,index=c("CHILDID"))#significant, basically what the authors found
+
+reg_zhfa_clus<-coeftest(reg_zhfa,vcov=vcovHC(reg_zhfa, type="HC0", cluster="group")) 
+reg_zhfa_clus
+
+identical(data_ys_os$sibzhfa,data_ys_os$zhfa)
+```
+
+```{r}
+#PPVT
+###ef-12 we do the same thing for PPVT .
+ppvt<-pe_r5_ycsib_ycsibling%>%filter(sibppvt_raw>=0)%>% mutate(std_PPVT_1=(sibppvt_raw-mean(sibppvt_raw))/sd(sibppvt_raw))%>%
+  mutate(STESTLNG=ifelse(STESTLNG==79|STESTLNG==88|STESTLNG==77,NA,STESTLNG))%>%mutate(ppvt_sp=ifelse(STESTLNG==31,1,0))%>%
+  mutate(ppvt_qe=ifelse(STESTLNG==32,1,0))%>%mutate(ppvt_ay=ifelse(STESTLNG==33,1,0))%>%mutate(ppvt_no=ifelse(STESTLNG==37,1,0))%>%
+  mutate(ppvt_oth=ifelse(ppvt_no==0 & ppvt_ay==0 &ppvt_qe==0 & ppvt_sp==0,1,0))
+
+data_cog<-index_sibR1R4_B%>% filter(cogsample==1)%>% filter(juntosgroup==1|juntosgroup==3)%>%mutate(sibben=sib*rec_juntos)%>% filter(round==1)
+data_ys_cog<-ppvt %>%rename(CHILDID=CHILDCODE)%>% arrange(CHILDID)%>%select(CHILDID)
+data_ys_cog$CHILDID= paste0("PE",  data_ys_cog$CHILDID)
+
+ys_cog<-data_cog%>% filter(sib==1)
+ys_id_cog<-merge(data_ys_cog,ys_cog,by="CHILDID")
+ys_id_cog<- ys_id_cog %>% filter(!is.na(sib)) %>% arrange(CHILDID)  
+
+ 
+
+ data_ys_cog1<-ppvt %>%rename(CHILDID=CHILDCODE)%>% arrange(CHILDID)
+data_ys_cog1$CHILDID= paste0("PE",  data_ys_cog1$CHILDID)
+
+data_2_cog<-ys_id_cog%>% select(CHILDID)
+ ys_ppvt<-merge(data_2_cog,data_ys_cog1)
+ ys_ppvt<-ys_ppvt %>%select(std_PPVT_1,ppvt_sp,ppvt_qe,ppvt_ay,ppvt_no,ppvt_oth)
+ 
+ 
+ yes_cog<-cbind(ys_id_cog,ys_ppvt)
+ 
+ #For the older sibling
+ ppvt_os<-pe_r4_yccog_youngerchild %>%filter(RAWSCRE>=0)%>%mutate(TESTLNG=ifelse(TESTLANG==79|TESTLANG==88|TESTLANG==77,NA,TESTLANG))%>% mutate(std_PPVT_1=(RAWSCRE-mean(RAWSCRE))/sd(RAWSCRE))%>%mutate(ppvt_sp=ifelse(TESTLANG==31,1,0))%>%mutate(ppvt_qe=ifelse(TESTLANG==32,1,0))%>%
+   mutate(ppvt_ay=ifelse(TESTLANG==33,1,0))%>%mutate(ppvt_no=ifelse(TESTLANG==37,1,0))%>%mutate(ppvt_oth=ifelse(ppvt_no==0 & ppvt_ay==0 &ppvt_qe==0 & ppvt_sp==0,1,0))
+
+  data_cog_os<-index_sibR1R4_B%>% filter(cogsample==1)%>% filter(juntosgroup==1|juntosgroup==3)%>%mutate(sibben=sib*rec_juntos)%>% filter(round==1)
+data_os_cog<-ppvt_os %>%rename(CHILDID=CHILDCODE)%>% arrange(CHILDID)%>%select(CHILDID)
+data_os_cog$CHILDID= paste0("PE",  data_os_cog$CHILDID)
+
+ os_cog<-data_cog%>%filter(sib==0)
+ os_id_cog<-merge(data_os_cog,os_cog,by="CHILDID")
+os_id_cog<- os_id_cog %>% filter(!is.na(sib)) %>% arrange(CHILDID)  
+
+ 
+
+ data_os_cog1<-ppvt_os %>%rename(CHILDID=CHILDCODE)%>% arrange(CHILDID)
+data_os_cog1$CHILDID= paste0("PE",  data_os_cog1$CHILDID)
+
+data_2_cog_os<-os_id_cog%>% select(CHILDID)
+ os_ppvt<-merge(data_2_cog_os,data_os_cog1)
+ os_ppvt<- os_ppvt %>%select(std_PPVT_1,ppvt_sp,ppvt_qe,ppvt_ay,ppvt_no,ppvt_oth)
+ 
+ 
+ yes_cog_os<-cbind(os_id_cog,os_ppvt)
+ yc_id_match<-yes_cog%>%select(CHILDID)
+ 
+ os_id_yc<-merge(yc_id_match,yes_cog_os,by="CHILDID")
+ 
+ data_os_yc_cog<-rbind(os_id_yc,yes_cog)
+ data_os_yc_cog<-data_os_yc_cog %>%  arrange(CHILDID)%>%mutate(sibben=sib*rec_juntos)%>%
+   mutate(Age_n=ifelse(sib==0,age+4,age+3)) %>% mutate(age_13=ifelse(Age_n==13,1,0))%>%
+   mutate(age_12=ifelse(Age_n==12,1,0))%>% mutate(age_11=ifelse(Age_n==11,1,0))%>% mutate(age_10=ifelse(Age_n==10,1,0))%>%
+   mutate(age_9=ifelse(Age_n==9,1,0))%>% mutate(age_8=ifelse(Age_n==8,1,0))%>% mutate(age_7=ifelse(Age_n==7,1,0))%>%
+  mutate(ppvt_sp = ifelse(ppvtlang== 4, 1, 0))%>%
+  mutate(ppvt_spq= ifelse(ppvtlang==3, 1, 0))%>%
+  mutate(ppvt_q= ifelse(ppvtlang== 2,1,0))%>%
+  mutate(ppvt_oth= ifelse(ppvtlang== 1,1,0))
+ 
+ 
+ reg_ppvt<-plm(std_PPVT_1~ppvt_sp+ppvt_spq+ppvt_q+ppvt_oth+sib+rec_juntos+sibben+age_11+age_12+age_13+age_10+age_9+age_8+
+                 age_7+female+Iybirth_2001+Iybirth_2002+Iybirth_2003+Iybirth_2004+Iybirth_2005+Iybirth_2006+Iybirth_2007+
+                 Iybirth_2008+Iybirth_2009+female+HHSIZER1,data=data_os_yc_cog,index=c("CHILDID"))
+
+ summary(reg_ppvt)
+reg_ppvt_clus<-coeftest(reg_ppvt,vcov=vcovHC(reg_ppvt, type="HC0", cluster="group")) 
+reg_ppvt_clus
+```
+
+
+
+
+```{r}
+#Objective of code chunk:
+#Reproducing equation 6 of paper
+
+rep_ant<-index_sibR1R4_B%>%filter(sample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%mutate(sibben=sib*rec_juntos)%>%mutate(estunted=as.numeric(estunted))%>%mutate(stunted=as.numeric(stunted))%>%filter(round==1)
+rep_cog<-index_sibR1R4_B%>%filter(cogsample==1)%>%filter(juntosgroup==1|juntosgroup==3) %>%
+  mutate(ppvt_sp = ifelse(ppvtlang== 4, 1, 0))%>%
+  mutate(ppvt_spq= ifelse(ppvtlang==3, 1, 0))%>%
+  mutate(ppvt_q= ifelse(ppvtlang== 2,1,0))%>%
+  mutate(ppvt_oth= ifelse(ppvtlang== 1,1,0))%>%mutate(sibben=sib*rec_juntos)%>%mutate(estunted=as.numeric(estunted))%>%mutate(stunted=as.numeric(stunted))%>%filter(round==1)
+
+reg_stunted<-plm(stunted~sib+rec_juntos+sibben+Iage_1+Iage_2+Iage_3+Iage_4+Iage_5+Iage_6+Iage_7+
+                   Iage_8+Iage_9+Iage_10+female+Iybirth_2001+Iybirth_2002+Iybirth_2003+Iybirth_2004+
+                   Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+Iybirth_2009+female,data=rep_ant,index=c("CHILDID"))#significant, basically what the authors found
+
+reg_estunted<-plm(estunted~sib+rec_juntos+sibben+Iage_1+Iage_2+Iage_3+Iage_4+Iage_5+Iage_6+
+                    Iage_7+Iage_8+Iage_9+Iage_10+female+Iybirth_2001+Iybirth_2002+Iybirth_2003+Iybirth_2004+
+                    Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+Iybirth_2009+female,data=rep_ant,index=c("CHILDID"))#significant, basically what the authors found
+
+reg_zhfa<-plm(zhfa~sib+rec_juntos+sibben+Iage_1+Iage_2+Iage_3+Iage_4+Iage_5+Iage_6+Iage_7+
+                Iage_8+Iage_9+Iage_10+female+Iybirth_2001+Iybirth_2002+Iybirth_2003+Iybirth_2004+
+                Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+Iybirth_2009+female,data=rep_ant,index=c("CHILDID"))#significant, basically what the authors found
+
+
+reg_ppvt<-plm(std_PPVT~ppvt_sp+ppvt_spq+ppvt_q+ppvt_oth+sib+rec_juntos+sibben+Iage_1+Iage_2+Iage_3+
+                Iage_4+Iage_5+Iage_6+Iage_7+Iage_8+Iage_9+Iage_10+female+Iybirth_2001+Iybirth_2002+
+                Iybirth_2003+Iybirth_2004+Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+
+                Iybirth_2009+female,data=rep_cog,index=c("CHILDID"))#significant, basically what the authors found
+
+reg_stunt_clus<-coeftest(reg_stunted,vcov=vcovHC(reg_stunted, type="HC0", cluster="group")) 
+reg_estun_clus<-coeftest(reg_estunted,vcov=vcovHC(reg_estunted, type="HC0", cluster="group")) 
+reg_zhfa_clus<-coeftest(reg_zhfa,vcov=vcovHC(reg_zhfa, type="HC0", cluster="group")) 
+reg_ppvt_clus<-coeftest(reg_ppvt,vcov=vcovHC(reg_ppvt, type="HC0", cluster="group")) 
+
+reg_stunt_clus
+reg_estun_clus
+reg_zhfa_clus
+reg_ppvt_clus 
+```
+
+```{r}
+#Objective of code chunk:
+#Reproducing equation 5 of paper
+pooled<-index_sibR1R4_B %>%filter(sample==1) %>%filter(juntosgroup==1|juntosgroup==3)%>%
+  mutate(stunted=as.numeric(stunted))%>%mutate(round_sib=ifelse(sib==1,round,0))%>% 
+  mutate(round_os=ifelse(sib==0,round,0))%>% mutate(aftsib=round_sib*rec_juntos)%>% mutate(aftos=round_os*rec_juntos)%>%
+  mutate(estunted=as.numeric(estunted))%>%
+  mutate(ppvt_sp = ifelse(ppvtlang== 4, 1, 0))%>%
+  mutate(ppvt_spq= ifelse(ppvtlang==3, 1, 0))%>%
+  mutate(ppvt_q= ifelse(ppvtlang== 2,1,0))%>%
+  mutate(ppvt_oth= ifelse(ppvtlang== 1,1,0))
+
+pooled_cog<-index_sibR1R4_B %>%filter(cogsample==1) %>%filter(juntosgroup==1|juntosgroup==3)%>%
+  mutate(stunted=as.numeric(stunted))%>%mutate(round_sib=ifelse(sib==1,round,0))%>%
+  mutate(round_os=ifelse(sib==0,round,0))%>% mutate(aftsib=round_sib*rec_juntos)%>% mutate(aftos=round_os*rec_juntos)%>%
+  mutate(estunted=as.numeric(estunted))%>%
+  mutate(ppvt_sp = ifelse(ppvtlang== 4, 1, 0))%>%
+  mutate(ppvt_spq= ifelse(ppvtlang==3, 1, 0))%>%
+  mutate(ppvt_q= ifelse(ppvtlang== 2,1,0))%>%
+  mutate(ppvt_oth= ifelse(ppvtlang== 1,1,0))
+
+a<-plm(stunted~round3+round4+round3xjuntos+round4xjuntos+rec_juntos+female+MUMED+CETH+wiR1+prom_nbi+Iage_1+ Iage_2 + 
+         Iage_3 +Iage_4+Iage_5+Iage_6+Iage_7+Iage_8+Iage_9+Iage_10+Iybirth_2001+Iybirth_2002+Iybirth_2003+
+         Iybirth_2004+Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+Iybirth_2009,data=pooled,index=c("pid"),model = "within")#significant, basically what the authors found
+
+b<-plm(estunted~round3+round4+round3xjuntos+round4xjuntos++rec_juntos+female+MUMED+CETH+wiR1+
+         prom_nbi+Iage_1+ Iage_2 + Iage_3 +Iage_4+Iage_5+Iage_6+Iage_7+Iage_8+Iage_9+Iage_10+
+         Iybirth_2001+Iybirth_2002+Iybirth_2003+Iybirth_2004+Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+Iybirth_2009,data=pooled,index=c("pid"))
+
+c<-plm(zhfa~round3+round4+round3xjuntos+round4xjuntos++rec_juntos+female+MUMED+CETH+wiR1+
+         prom_nbi+Iage_1+ Iage_2 + Iage_3 +Iage_4+Iage_5+Iage_6+Iage_7+Iage_8+Iage_9+
+         Iage_10+Iybirth_2001+Iybirth_2002+Iybirth_2003+Iybirth_2004+Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+Iybirth_2009,data=pooled,index=c("pid"))
+
+d<-plm(std_PPVT~ppvt_sp+ppvt_spq+ppvt_q+ppvt_oth+round3+round4+round3xjuntos+round4xjuntos+
+         rec_juntos+female+MUMED+CETH+wiR1+prom_nbi+Iage_1+ Iage_2 + Iage_3 +Iage_4+Iage_5+
+         Iage_6+Iage_7+Iage_8+Iage_9+Iage_10+Iybirth_2001+Iybirth_2002+Iybirth_2003+
+         Iybirth_2004+Iybirth_2005+Iybirth_2006+Iybirth_2007+Iybirth_2008+Iybirth_2009,data=pooled_cog,index=c("pid"))
+
+a_1<-coeftest(a,vcov=vcovHC(a, type="HC0", cluster="group")) 
+b_1<-coeftest(b,vcov=vcovHC(b, type="HC0", cluster="group")) 
+c_1<-coeftest(c,vcov=vcovHC(c, type="HC0", cluster="group")) 
+d_1<-coeftest(d,vcov=vcovHC(d, type="HC0", cluster="group")) 
+
+a_1
+b_1
+c_1
+d_1
+
+```
+
+```{r}
+#Objective of code:
+#comparison between those that were not selected to those that we selected nutritional outcomes round 4 and round 3, Younger sibling
+
+#round 4
+rob_check_totsamp<-index_sibR1R4_B%>%filter(sample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%filter(sib==1)%>%mutate(sibben=NA)%>%mutate(sibzhfa=NA)%>%mutate(selected=0)%>%filter(round==1)
+
+rob_yes<-yes %>% mutate(selected=1)
+#rob_yes_id<-rob_yes%>% select(CHILDID)
+
+id_not_selected<-merge(rob_yes,rob_check_totsamp,by="CHILDID", all=TRUE)
+id_not_selected<-id_not_selected %>%filter(is.na(sib.x))#%>%select(CHILDID,sib.x)
+
+id_not_selected_with_data<-merge(id_not_selected,rob_check_totsamp,by="CHILDID", all=TRUE)
+id_not_selected_with_data<-id_not_selected_with_data%>% filter(!(is.na(sib.y)))%>%select(!(2:197))
+
+
+#round 3
+rob_check_totsamp_r3<-index_sibR1R4_B%>%filter(sample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%filter(sib==1)%>%mutate(sibben=NA)%>%mutate(sibzhfa=NA)%>%mutate(selected=0)%>%filter(round==0)
+
+rob_yes_r3<-yes %>% mutate(selected=1) 
+id_yes_r3<-merge(rob_yes_r3,rob_check_totsamp_r3,by="CHILDID", all=TRUE)
+id_yes_r3<-id_yes_r3%>%filter(!(is.na(sib.x)))%>%select(!(2:197))
+
+id_not_selected_r3<-merge(rob_yes,rob_check_totsamp_r3,by="CHILDID", all=TRUE)
+id_not_selected_r3<-id_not_selected_r3 %>%filter(is.na(sib.x))#%>%select(CHILDID,sib.x)
+
+id_not_selected_with_data_r3<-merge(id_not_selected_r3,rob_check_totsamp_r3,by="CHILDID", all=TRUE)
+id_not_selected_with_data_r3<-id_not_selected_with_data_r3%>% filter(!(is.na(sib.y)))%>%select(!(2:197))
+
+
+#rob_test_ys<-rbind(id_not_selected_with_data,rob_yes)
+
+
+#round 4 comparison
+t.test(rob_yes$stunted,id_not_selected_with_data$stunted.y)
+t.test(rob_yes$estunted,id_not_selected_with_data$estunted.y)
+t.test(rob_yes$zhfa,id_not_selected_with_data$zhfa.y)
+t.test(rob_yes$PPVT,id_not_selected_with_data$PPVT.y)
+
+'round 3'
+#round 3 comparison
+t.test(id_yes_r3$stunted.y,id_not_selected_with_data_r3$stunted.y)
+t.test(id_yes_r3$estunted.y,id_not_selected_with_data_r3$estunted.y)
+t.test(id_yes_r3$zhfa.y,id_not_selected_with_data_r3$zhfa.y)
+t.test(id_yes_r3$PPVT.y,id_not_selected_with_data_r3$PPVT.y)
+
+mean(id_not_selected_with_data$rec_juntos.y)
+mean(rob_yes$rec_juntos)
+
+```
+
+
+```{r}
+#Objective of code:
+#comparison between those that were not selected to those that we selected nutritional outcomes round 3 and round 2, Older sibling
+rob_check_totsamp_os<-index_sibR1R4_B%>%filter(sample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%
+  filter(sib==0)%>%mutate(sibben=NA)%>%mutate(sibzhfa=NA)%>%mutate(selected=0)%>%filter(round==1)
+
+rob_yes_os_r3<-id_os_ys_match %>% mutate(selected=1)
+#rob_yes_id<-rob_yes%>% select(CHILDID)
+
+id_not_selected_os<-merge(rob_yes_os_r3,rob_check_totsamp_os,by="CHILDID", all=TRUE)
+id_not_selected_os<-id_not_selected_os %>%filter(is.na(sib.x))#%>%select(CHILDID,sib.x)
+
+id_not_selected_with_data_os<-merge(id_not_selected_os,rob_check_totsamp_os,by="CHILDID", all=TRUE)
+id_not_selected_with_data_os<-id_not_selected_with_data_os%>% filter(!(is.na(sib.y)))%>%select(!(2:197))
+
+rob_check_totsamp_os_r3<-index_sibR1R4_B%>%filter(sample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%
+  filter(sib==0)%>%mutate(sibben=NA)%>%mutate(sibzhfa=NA)%>%mutate(selected=0)%>%filter(round==0)
+
+rob_yes_os_r3<-id_os_ys_match %>% mutate(selected=1) 
+id_yes_os_r3<-merge(rob_yes_os_r3,rob_check_totsamp_os_r3,by="CHILDID", all=TRUE)
+id_yes_os_r3<-id_yes_os_r3%>%filter(!(is.na(sib.x)))%>%select(!(2:197))
+
+id_not_selected_os_r3<-merge(rob_yes_os_r3,rob_check_totsamp_os_r3,by="CHILDID", all=TRUE)
+id_not_selected_os_r3<-id_not_selected_os_r3 %>%filter(is.na(sib.x))#%>%select(CHILDID,sib.x)
+
+id_not_selected_with_data_os_r3<-merge(id_not_selected_os_r3,rob_check_totsamp_os_r3,by="CHILDID", all=TRUE)
+id_not_selected_with_data_os_r3<-id_not_selected_with_data_os_r3%>% filter(!(is.na(sib.y)))%>%select(!(2:197))
+
+
+
+#round 3 comparison
+t.test(rob_yes_os$stunted,id_not_selected_with_data_os$stunted.y)
+t.test(rob_yes_os$estunted,id_not_selected_with_data_os$estunted.y)
+t.test(rob_yes_os$zhfa,id_not_selected_with_data_os$zhfa.y)
+t.test(rob_yes_os$PPVT,id_not_selected_with_data_os$PPVT.y)
+t.test(rob_yes_os$rec_juntos,id_not_selected_with_data_os$rec_juntos.y)
+
+'Round 2'
+#round 2 comparison
+t.test(id_yes_os_r3$stunted.y,id_not_selected_with_data_os_r3$stunted.y)
+t.test(id_yes_os_r3$estunted.y,id_not_selected_with_data_os_r3$estunted.y)
+t.test(id_yes_os_r3$zhfa.y,id_not_selected_with_data_os_r3$zhfa.y)
+t.test(id_yes_os_r3$PPVT.y,id_not_selected_with_data_os_r3$PPVT.y)
+
+
+```
+
+```{r}
+#Objective of code:
+#comparison between those that were not selected to those that we selected cognitive outcomes round 4 and round 3
+
+### Younger Sibling
+rob_check_totsamp_cog<-index_sibR1R4_B%>%filter(cogsample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%filter(sib==1)%>%
+  mutate(sibben=NA)%>%mutate(sibzhfa=NA)%>%mutate(selected=0)%>%filter(round==1)
+
+rob_yes_cog<-ys_id_cog %>% mutate(selected=1)
+
+
+id_not_selected_cog<-merge(rob_yes_cog,rob_check_totsamp_cog,by="CHILDID", all=TRUE)
+id_not_selected_cog<-id_not_selected_cog %>%filter(is.na(sib.x))
+
+id_not_selected_with_data_cog<-merge(id_not_selected_cog,rob_check_totsamp_cog,by="CHILDID", all=TRUE)
+id_not_selected_with_data_cog<-id_not_selected_with_data_cog%>% filter(!(is.na(sib.y)))%>%select(!(2:197))
+
+
+
+rob_check_totsamp_cog_r3<-index_sibR1R4_B%>%filter(cogsample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%filter(sib==1)%>%
+  mutate(sibben=NA)%>%mutate(sibzhfa=NA)%>%mutate(selected=0)%>%filter(round==0)
+
+rob_yes_cog_r3<-ys_id_cog %>% mutate(selected=1) 
+id_yes_cog_r3<-merge(rob_yes_cog_r3,rob_check_totsamp_cog_r3,by="CHILDID", all=TRUE)
+id_yes_cog_r3<-id_yes_cog_r3%>%filter(!(is.na(sib.x)))%>%select(!(2:197))
+
+id_not_selected_cog_r3<-merge(rob_yes_cog_r3,rob_check_totsamp_cog_r3,by="CHILDID", all=TRUE)
+id_not_selected_cog_r3<-id_not_selected_cog_r3 %>%filter(is.na(sib.x))#%>%select(CHILDID,sib.x)
+
+id_not_selected_with_data_cog_r3<-merge(id_not_selected_cog_r3,rob_check_totsamp_r3,by="CHILDID", all=TRUE)
+id_not_selected_with_data_cog_r3<-id_not_selected_with_data_cog_r3%>% filter(!(is.na(sib.y)))%>%select(!(2:197))
+
+
+### Older sibling
+rob_check_totsamp_os_cog<-index_sibR1R4_B%>%filter(cogsample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%
+  filter(sib==0)%>%mutate(sibben=NA)%>%mutate(sibzhfa=NA)%>%mutate(selected=0)%>%filter(round==1)
+
+rob_yes_os_cog<-os_id_cog %>% mutate(selected=1)
+#rob_yes_id<-rob_yes%>% select(CHILDID)
+
+id_not_selected_os_cog<-merge(rob_yes_os_cog,rob_check_totsamp_os_cog,by="CHILDID", all=TRUE)
+id_not_selected_os_cog<-id_not_selected_os_cog %>%filter(is.na(sib.x))#%>%select(CHILDID,sib.x)
+
+id_not_selected_with_data_os_cog<-merge(id_not_selected_os_cog,rob_check_totsamp_os_cog,by="CHILDID", all=TRUE)
+id_not_selected_with_data_os_cog<-id_not_selected_with_data_os_cog%>% filter(!(is.na(sib.y)))%>%select(!(2:197))
+
+rob_check_totsamp_os_r3_cog<-index_sibR1R4_B%>%filter(cogsample==1)%>%filter(juntosgroup==1|juntosgroup==3)%>%
+  filter(sib==0)%>%mutate(sibben=NA)%>%mutate(sibzhfa=NA)%>%mutate(selected=0)%>%filter(round==0)
+
+rob_yes_os_r3_cog<-data_os_yc_cog%>%filter(sib==0)%>% mutate(selected=1) 
+id_yes_os_r3_cog<-merge(rob_yes_os_r3_cog,rob_check_totsamp_os_r3_cog,by="CHILDID", all=TRUE)
+id_yes_os_r3_cog<-id_yes_os_r3_cog%>%filter(!(is.na(round.y)))%>%filter(!(is.na(sib.x)))%>%select(!(2:197))
+
+id_not_selected_os_r3_cog<-merge(rob_yes_os_r3_cog,rob_check_totsamp_os_r3_cog,by="CHILDID", all=TRUE)
+id_not_selected_os_r3_cog<-id_not_selected_os_r3_cog %>%filter(is.na(sib.x))#%>%select(CHILDID,sib.x)
+
+id_not_selected_with_data_os_r3_cog<-merge(id_not_selected_os_r3_cog,rob_check_totsamp_os_r3_cog,by="CHILDID", all=TRUE)
+id_not_selected_with_data_os_r3_cog<-id_not_selected_with_data_os_r3_cog%>% filter(!(is.na(sib.y)))%>%select(!(2:197))
+
+```
+
+
+```{r}
+
+'round 3 treated younger siblings'
+t.test(id_yes_r3$zhfa.y[id_yes_r3$rec_juntos.y==1],id_not_selected_with_data_r3$zhfa.y[id_not_selected_with_data_r3$rec_juntos.y==1])
+t.test(id_yes_cog_r3$std_PPVT.y[id_yes_cog_r3$rec_juntos.y==1],id_not_selected_with_data_cog_r3$std_PPVT.y[id_not_selected_with_data_cog_r3$rec_juntos.y==1])
+
+'round 3 untreated younger siblings'
+t.test(id_yes_r3$zhfa.y[id_yes_r3$rec_juntos.y==0],id_not_selected_with_data_r3$zhfa.y[id_not_selected_with_data_r3$rec_juntos.y==0])
+t.test(id_yes_cog_r3$std_PPVT.y[id_yes_cog_r3$rec_juntos.y==0],id_not_selected_with_data_cog_r3$std_PPVT.y[id_not_selected_with_data_cog_r3$rec_juntos.y==0])
+
+'round 4, treated younger siblings'
+t.test(rob_yes_os_r3$zhfa[rob_yes_r3$rec_juntos==1],id_not_selected_with_data_os$zhfa.y[id_not_selected_with_data_os$rec_juntos.y==1])
+t.test(rob_yes_cog$std_PPVT[rob_yes_cog$rec_juntos==1],id_not_selected_with_data_cog$std_PPVT.y[id_not_selected_with_data_cog$rec_juntos.y==1])
+
+'round 4, untreated younger siblings'
+t.test(rob_yes_r3$zhfa[rob_yes_r3$rec_juntos==0],id_not_selected_with_data$zhfa.y[id_not_selected_with_data$rec_juntos.y==0])
+t.test(rob_yes_cog$std_PPVT[rob_yes_cog$rec_juntos==0],id_not_selected_with_data_cog$std_PPVT.y[id_not_selected_with_data_cog$rec_juntos.y==0])
+
+```
+
+
+
+
+```{r}
+#Objective of Code:
+# Comparison between subgroups for treated and untreated, older and younger siblings, for all rounds to be used for LATEX table
+'round 2 treated old siblings'
+t.test(id_yes_os_r3$zhfa.y[id_yes_os_r3$rec_juntos.y==1],id_not_selected_with_data_os_r3$zhfa.y[id_not_selected_with_data_os_r3$rec_juntos.y==1])
+t.test(id_yes_os_r3_cog$std_PPVT.y[id_yes_os_r3_cog$rec_juntos.y==1],id_not_selected_with_data_os_r3_cog$std_PPVT.y[id_not_selected_with_data_os_r3_cog$rec_juntos.y==1])
+
+'round 2 untreated older siblings'
+t.test(id_yes_os_r3$zhfa.y[id_yes_os_r3$rec_juntos.y==0],id_not_selected_with_data_os_r3$zhfa.y[id_not_selected_with_data_os_r3$rec_juntos.y==0])
+t.test(id_yes_os_r3_cog$std_PPVT.y[id_yes_os_r3_cog$rec_juntos.y==0],id_not_selected_with_data_os_r3_cog$std_PPVT.y[id_not_selected_with_data_os_r3_cog$rec_juntos.y==0])
+
+'round 3, treated older siblings'
+t.test(rob_yes_os_r3$zhfa[rob_yes_r3$rec_juntos==1],id_not_selected_with_data_os$zhfa.y[id_not_selected_with_data_os$rec_juntos.y==1])
+t.test(rob_yes_os_cog$std_PPVT[rob_yes_os_cog$rec_juntos==1],id_not_selected_with_data_os_cog$std_PPVT.y[id_not_selected_with_data_os_cog$rec_juntos.y==1])
+
+'round 3, untreated older siblings'
+t.test(rob_yes_os_r3$zhfa[rob_yes_r3$rec_juntos==0],id_not_selected_with_data_os$zhfa.y[id_not_selected_with_data_os$rec_juntos.y==0])
+t.test(rob_yes_os_cog$std_PPVT[rob_yes_os_cog$rec_juntos==0],id_not_selected_with_data_os_cog$std_PPVT.y[id_not_selected_with_data_os_cog$rec_juntos.y==0])
+
+
+
+```
+
+```{r}
+
+#round 3 comparison
+t.test(rob_yes_os_r3$zhfa,id_not_selected_with_data_os$zhfa.y)
+t.test(rob_yes_os_cog$std_PPVT,id_not_selected_with_data_os_cog$std_PPVT.y)
+'Round 2'
+#round 2 comparison
+t.test(id_yes_os_r3$zhfa.y,id_not_selected_with_data_os_r3$zhfa.y)
+t.test(id_yes_os_r3_cog$std_PPVT.y,id_not_selected_with_data_os_r3_cog$std_PPVT.y)
+
+sum(rob_yes_cog_r3$rec_juntos==0)
+```
+
+```{r}
+'round 3'
+t.test(id_yes_r3$zhfa.y,id_not_selected_with_data_r3$zhfa.y)
+t.test(id_yes_cog_r3$std_PPVT.y,id_not_selected_with_data_cog_r3$std_PPVT.y)
+'round 4 comparison'
+t.test(rob_yes$zhfa,id_not_selected_with_data$zhfa.y)
+t.test(rob_yes_cog$std_PPVT,id_not_selected_with_data_cog$std_PPVT.y)
+
+```
+
+
+'Ritika did Propensity score matching'
+
+

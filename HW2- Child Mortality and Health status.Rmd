@@ -1,0 +1,1085 @@
+---
+title: "Homework 2, measurement"
+author: "Alex Vaval"
+date: "9/18/2020"
+output: pdf_document
+
+---
+```{r,include=F}
+library(tidyverse)
+library(haven)
+library(broom)
+library(kableExtra)
+library(purrr)
+library(ivpack)
+library(stargazer)
+library(dplyr)
+
+ds<-read_dta("Data/civ88_mort.dta")
+summary(ds)
+
+```
+# PART 1, Child Mortality in Cote d'Ivoire
+## Q1
+```{r,include=F}
+ds<-ds%>%mutate (nweight=n_wom*pweight)
+```
+We should transform the weight by multiplying it by the number of women per households. I think this is the correct way to go because, each household has been attributed weights based on certain characteristics and how representative they are of the household population.For example, if a house is perfectly representative of the population than its weight is 1.
+
+We randomly select a women from that household to have the women representative of that household. However, when there are multiple women, we want the women selected to somehow reflect these women in the household as well. Therefore,  by multiplying the household weight by the number of women, we are effectively reflecting the weight of these women in the weight attributed to that randomly selected women. 
+
+## Q2
+
+### (A)
+
+Method 2 seems to be more preferable because, using that method, every child that we are studying is at least 5 years old, therefore we would have have an accurate result on the under 5 mortality rate. Having survived until five, the mortality of children under five is fixed and will not vary for that cohort.
+
+Using method 1, the children havent actually reached 5 years old yet. For example, people born 0,1,2,3,4 years ago still have 4,3,2,1 years where they could potentially die. Therefore, we are not accurately computing the mortality rate within that cohort. It would be the current rate of people that have died so far in that cohort. If we were to compute the mortality rate 2 years later using that method, we would probably find that it is different from what we'd have found previously.
+
+The difference in the two methods can be summarized by this, one is a snapshot of a moving phenomenon, the other is a snapshot shot of an immobile phenomenon.
+
+### (B)
+#### i.
+```{r,include=F}
+ds.Q2g1<- ds%>% filter(girls_l5>0)%>%select(hhid:nweight)
+ds.Q2b1<- ds %>% filter(boys_l5>0)%>%select(hhid:nweight)
+mort_rate_gl5=sum(ds.Q2g1$dgirls_l5*ds.Q2g1$nweight)/sum(ds.Q2g1$girls_l5*ds.Q2g1$nweight)
+mort_rate_gl5
+mort_rate_bl5=sum(ds.Q2b1$dboys_l5*ds.Q2b1$nweight)/sum(ds.Q2b1$boys_l5*ds.Q2b1$nweight)
+mort_rate_bl5
+
+
+M1<-ds %>% filter(hhid==1) %>%select(.)%>% mutate(Boys=mort_rate_bl5)%>% mutate(Girls=mort_rate_gl5) %>% mutate(Method="")%>% select(Method,Boys,Girls)
+
+
+Obs1<-ds %>% filter(hhid==1) %>%select(.)%>% mutate(Boys=sum(ds.Q2b1$boys_l5))%>%mutate(Girls=sum(ds.Q2g1$girls_l5)) %>% mutate(Method="N")
+
+M1<-rbind(M1,Obs1)
+
+ds.Q2g2<- ds%>% filter(girls>0)%>%select(hhid:nweight)
+ds.Q2b2<- ds %>% filter(boys>0)%>%select(hhid:nweight)
+
+mort_rate_gu5=sum((ds.Q2g2$dgirls_u5-ds.Q2g2$dgirls_l5)*ds.Q2g2$nweight)/sum((ds.Q2g2$girls-ds.Q2g2$girls_l5)*ds.Q2g2$nweight)
+                                                  
+mort_rate_bu5=sum((ds.Q2b2$dboys_u5-ds.Q2b2$dboys_l5)*ds.Q2b2$nweight)/sum((ds.Q2b2$boys-ds.Q2b2$boys_l5)*ds.Q2b2$nweight)
+
+ M2<-ds %>% filter(hhid==1) %>%select(.)%>% mutate(Boys=mort_rate_bu5)%>% mutate(Girls=mort_rate_gu5) %>% mutate(Method="")%>% select(Method,Boys,Girls) 
+ 
+Obs2<-ds %>% filter(hhid==1) %>%select(.)%>% mutate(Boys=(sum(ds.Q2b2$boys)-sum(ds.Q2b2$boys_l5)))%>%mutate(Girls=(sum(ds.Q2g2$girls)-sum(ds.Q2g2$girls_l5))) %>% mutate(Method="N")
+
+M2<-rbind(M2,Obs2)
+TAB<-rbind(M1,M2)
+
+```
+```{r,echo=F}
+kable(TAB, caption= 'Infant mortality by sex', col.names=c("","Boys","Girls"), align=c("l","c","c"),digits=3,booktab=T)%>% pack_rows("Method 1", 1,2)%>%pack_rows("Method 2", 3, 4) %>% kable_styling() %>% add_footnote("Method 1 uses the children born 0-4 years ago",notation = "alphabet")%>% add_footnote("Method 2 uses children born 5-9 years ago",notation = "alphabet")%>% kable_styling(latex_option="HOLD_position")
+
+
+
+```
+
+#### ii.
+
+We see that the first method gives us lower mortality rates (as expected) than the second method.Using our argument from Q1, that can be explained by the fact that the kids that should/will die before 5 havent died yet hen using method 1.  
+
+Method 2 allows us to capture the entirety of deaths before five and the mortality rates are therefore higher.
+
+Also, we notice that the boys' mortality rates are  higher mortality rate than the girls even when they are compared using different methods. The difference however tends to narrow overtime which could mean that boys under 5 tend to  die younger than girls for the children under 5.
+
+
+# Part 2 Health status, nutritional status and wealth in Cote d'ivoire
+## Q1
+
+The conditions that should hold for us to compare weights overtime are the following:
+
+- The unit of measurement should stay the same between previous years.
+
+- Normality condition
+
+These two conditions are in my opinion what is necessary for us to compare the weights overtime because,if the units stay the same across years, we can safely compare the distribution of weights in 1988 and 1993. They should not be dramatically different (only in the case of an external shock), therefore we would be able to know what are the values that we consider to be "normal" in Cote d'Ivoire for kids less than 5.
+
+The normality condition would allow us assume that the weights are generally around 4-5 standard deviations from the mean.
+
+Thus, if all these conditions hold, we would notice if there is a change in units, and modify the data such that our units match the previous years. We would also notice the difference if some values are in Kg and others are in Hg (large variance) and could convert them to the units of the previous years.
+
+
+
+
+## Q2
+```{r,include=F}
+library(tidyverse)
+library(haven)
+library(broom)
+library(kableExtra)
+library(purrr)
+library(ivpack)
+
+df<-read_dta("Data/civ88-08_nutri.dta")
+summary(df)
+
+
+
+
+
+dfq2<-df %>% filter(height>=20)%>%filter(height<=170)%>%mutate(individual=1)
+dfq2<-mutate(dfq2,zscore=((dfq2$height-dfq2$medheight)/dfq2$stdheight))
+
+dfq2.1<-df %>% filter(height>=20) %>%filter(height<=170)%>% mutate(individual=1)%>%filter(dfq2$year==1988)
+dfq2.1<-mutate(dfq2.1,zscore=((dfq2.1$height-dfq2.1$medheight)/dfq2.1$stdheight))
+
+dfq2.2<-df %>% filter(height>=20) %>%filter(height<=170)%>% mutate(individual=1)%>%filter(dfq2$year==1993)
+dfq2.2<-mutate(dfq2.2,zscore=((dfq2.2$height-dfq2.2$medheight)/dfq2.2$stdheight))
+
+dfq2.3<-df %>% filter(height>=20)%>%filter(height<=170)%>% mutate(individual=1)%>%filter(dfq2$year==2008)
+dfq2.3<-mutate(dfq2.3,zscore=((dfq2.3$height-dfq2.3$medheight)/dfq2.3$stdheight))
+
+z1<-tidy(summary(dfq2.1$zscore)) %>% mutate(Std.dev=sqrt(var(dfq2.1$zscore)))%>% mutate(Observations=sum(dfq2.1$individual))%>% mutate(Year="1988")%>%select(Year,minimum,median,mean,maximum,Std.dev,Observations)
+
+z2<- tidy(summary(dfq2.2$zscore)) %>% mutate(Std.dev=sqrt(var(dfq2.2$zscore)))%>% mutate(Observations=sum(dfq2.2$individual))%>%mutate(Year="1993")%>%select(Year,minimum,median,mean,maximum,Std.dev,Observations)
+
+
+z3<-tidy(summary(dfq2.3$zscore))%>% mutate(Std.dev=sqrt(var(dfq2.3$zscore)))%>% mutate(Observations=sum(dfq2.3$individual))%>%mutate(Year="2008")%>% select(Year,minimum,median,mean,maximum,Std.dev,Observations)
+
+z<-rbind(z1,z2,z3)
+```
+```{r,echo=F}
+kable(z, caption= 'Summary statistics on of z-scores of the sample ', col.names=c("Year","Minimum","Median","Mean","Maximum","Standard deviation","Observations"), align=c("l","r","r","r","r","r","r","r"),digits=3, booktab=T)%>% kable_styling(latex_options = "HOLD_position") %>% add_footnote("The sample of z-scores here are only for the individuals with a height superior to 20 cm and shorter than 170 cm. These are the 2 lowest values possible for the youngest newborn to have lived and the tallest 5 year old ever recorded",notation = "alphabet") 
+```
+
+## Q3
+
+### (A)
+
+
+
+```{r,include=F}
+
+ds.pop.2_4_88<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==1988)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.stunt.88<- ds.pop.2_4_88 %>% filter(zscore<=(-2)) 
+
+stunt.pop.88=sum(ds.stunt.88$individual*ds.stunt.88$pweight)/sum(ds.pop.2_4_88$individual*ds.pop.2_4_88$pweight)
+
+
+
+ds.pop.2_4_93<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==1993)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.stunt.93<- ds.pop.2_4_93 %>% filter(zscore<=(-2)) 
+
+stunt.pop.93=sum(ds.stunt.93$individual*ds.stunt.93$pweight)/sum(ds.pop.2_4_93$individual*ds.pop.2_4_93$pweight)
+
+ds.pop.2_4_08<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==2008)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.stunt.08<- ds.pop.2_4_08 %>% filter(zscore<=(-2)) 
+
+stunt.pop.08=sum(ds.stunt.08$individual*ds.stunt.08$pweight)/sum(ds.pop.2_4_08$individual*ds.pop.2_4_08$pweight)
+
+POP<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"=stunt.pop.88)%>% mutate("1993"=stunt.pop.93) %>% mutate("2008"=stunt.pop.08)%>% mutate(Region="National")%>% select(Region,"1988","1993","2008")
+
+ObsPOP<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"=sum(ds.pop.2_4_88$individual))%>%mutate("1993"=sum(ds.pop.2_4_93$individual)) %>%mutate("2008"=sum(ds.pop.2_4_08$individual))%>% mutate(Region="Observations")
+
+TABQ3<-rbind(POP,ObsPOP)
+
+TABQ3
+
+```
+
+
+
+
+```{r,include=F}
+
+ds.popN.2_4_88<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0)%>% filter(year==1988)%>% filter(north==1)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.popS.2_4_88<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0)%>% filter(year==1988)%>% filter(north==0)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+
+ds.stunt.north_88<-ds.popN.2_4_88 %>% filter(zscore<=(-2))%>% filter(north==1) %>% mutate(individual=1)
+ds.stunt.south_88<-ds.popS.2_4_88 %>% filter(zscore<=(-2))  %>%filter(north==0)%>% mutate(individual=1)
+
+stunt.north.88=sum(ds.stunt.north_88$individual*ds.stunt.north_88$pweight)/sum(ds.popN.2_4_88$individual*ds.popN.2_4_88$pweight)
+stunt.south.88=sum(ds.stunt.south_88$individual*ds.stunt.south_88$pweight)/sum(ds.popS.2_4_88$individual*ds.popS.2_4_88$pweight)
+
+
+ds.popN.2_4_93<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0)%>% filter(year==1993)%>% filter(north==1)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.popS.2_4_93<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0)%>% filter(year==1993)%>% filter(north==0)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.stunt.north_93<-ds.popN.2_4_93 %>% filter(zscore<=(-2))  %>% mutate(individual=1)
+ds.stunt.south_93<-ds.popS.2_4_93 %>% filter(zscore<=(-2)) %>% mutate(individual=1)
+
+stunt.north.93=sum(ds.stunt.north_93$individual*ds.stunt.north_93$pweight)/sum(ds.popN.2_4_93$individual*ds.popN.2_4_93$pweight)
+stunt.south.93=sum(ds.stunt.south_93$individual*ds.stunt.south_93$pweight)/sum(ds.popS.2_4_93$individual*ds.popS.2_4_93$pweight)
+
+
+ds.popN.2_4_08<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0)%>% filter(year==2008)%>% filter(north==1)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.popS.2_4_08<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0)%>% filter(year==2008) %>% filter(north==0)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.stunt.north_08<-ds.popN.2_4_08 %>% filter(zscore<=(-2)) %>%mutate(individual=1)
+ds.stunt.south_08<-ds.popS.2_4_08%>% filter(zscore<=(-2)) %>% mutate(individual=1)
+
+stunt.north.08=sum(ds.stunt.north_08$individual*ds.stunt.north_08$pweight)/sum(ds.popN.2_4_08$individual*ds.popN.2_4_08$pweight)
+stunt.south.08=sum(ds.stunt.south_08$individual*ds.stunt.south_08$pweight)/sum(ds.popS.2_4_08$individual*ds.popS.2_4_08$pweight)
+
+POPN<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"=stunt.north.88)%>% mutate("1993"=stunt.north.93) %>% mutate("2008"=stunt.north.08)%>% mutate(Region="North")%>% select(Region,"1988","1993","2008")
+
+POPS<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"=stunt.south.88)%>% mutate("1993"=stunt.south.93) %>% mutate("2008"=stunt.south.08)%>% mutate(Region="South")%>% select(Region,"1988","1993","2008")
+
+
+ObsN<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"=sum(ds.popN.2_4_88$individual))%>%mutate("1993"=sum(ds.popN.2_4_93$individual)) %>%mutate("2008"=sum(ds.popN.2_4_08$individual))%>% mutate(Region="Observations")
+
+POPobsN<-rbind(POPN,ObsN)
+
+ObsS<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"= sum(ds.popS.2_4_88$individual))%>%mutate("1993"=sum(ds.popN.2_4_93$individual)) %>%mutate("2008"=sum(ds.popN.2_4_88$individual))%>% mutate(Region="Observations")
+
+POPobsS<-rbind(POPS,ObsS)
+
+TABQ3b<-rbind(POPobsS,POPobsN)
+
+
+TABQ3.tot<-rbind(TABQ3b,TABQ3)
+TABQ3.tot
+
+
+```
+
+```{r,echo=FALSE}
+kable(TABQ3.tot, caption='Stunting rate by region', col.names=c("Region","1988","1993","2008"), align=c("l","c","c","c"),digits=3, booktab=T)%>%pack_rows("Southern",1,2)%>%pack_rows("Northern",3,4)%>%pack_rows("National",5,6)%>%kable_styling(latex_options = "HOLD_position")
+```
+To compute the stunting rate, we cleaned our data by finding the two extreme cases, the shortest newborn and the tallest 5 year old to have "reasonable" bounds. We cleaned our data a second time for z-scores between -5 and 5 because basically all the values should be in that range. The reason why we did not pick a different z-score range like -4 to 4 is because, when we look at our summary statistics, we notice that it is slightly in the negatives, therefore we accounted for that.
+
+When looking at the table we can make multiple observations.
+
+First, we see that there is a upward then downward trend, in the stunting rate for 2-4 years old on a national level. Indeed, we see that the stunting rate increased from 0.24 in 1988 to 0.41 in 1993 then slightly decreased to 0.38 in 2008. That pattern is also true at the regional level. What we can infer from this is that there must have been a shock between 1988 and 1993 that made the stunting rate sharply increase.
+
+Second, we notice that there is also a difference depending on region. Looking at regions North and South, we notice that the stunting rate in the North is usually higher than that of the South. Year 1993, is an exception, we see that it is the only year when the stunting rate is higher in the south than in the north (0.41 vs 0.4).Using our shock hypothesis, our data tells us that the South must have been hit much harder than the North.
+
+### (B)
+
+```{r,include=F}
+
+ds.popB.2_4_88<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==1988)%>% filter(zscore>=(-5)) %>% filter(sexe==1)%>%filter(zscore<=(5))
+ds.stuntB.88<- ds.popB.2_4_88 %>% filter(zscore<=(-2)) 
+
+ds.popG.2_4_88<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==1988)%>% filter(zscore>=(-5)) %>% filter(sexe==0)%>%filter(zscore<=(5))
+ds.stuntG.88<- ds.popG.2_4_88 %>% filter(zscore<=(-2)) 
+
+stunt.popB.88=sum(ds.stuntB.88$individual*ds.stuntB.88$pweight)/sum(ds.popB.2_4_88$individual*ds.popB.2_4_88$pweight)
+stunt.popG.88=sum(ds.stuntG.88$individual*ds.stuntG.88$pweight)/sum(ds.popG.2_4_88$individual*ds.popG.2_4_88$pweight)
+
+ds.popB.2_4_93<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==1993)%>% filter(zscore>=(-5)) %>% filter(sexe==1)%>%filter(zscore<=(5))
+ds.stuntB.93<- ds.popB.2_4_93 %>% filter(zscore<=(-2)) 
+
+ds.popG.2_4_93<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==1993)%>% filter(zscore>=(-5)) %>% filter(sexe==0)%>%filter(zscore<=(5))
+ds.stuntG.93<- ds.popG.2_4_93 %>% filter(zscore<=(-2)) 
+
+stunt.popB.93=sum(ds.stuntB.93$individual*ds.stuntB.93$pweight)/sum(ds.popB.2_4_93$individual*ds.popB.2_4_93$pweight)
+stunt.popG.93=sum(ds.stuntG.93$individual*ds.stuntG.93$pweight)/sum(ds.popG.2_4_93$individual*ds.popG.2_4_93$pweight)
+
+ds.popB.2_4_08<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==2008)%>% filter(zscore>=(-5)) %>% filter(sexe==1)%>%filter(zscore<=(5))
+ds.stuntB.08<- ds.popB.2_4_08 %>% filter(zscore<=(-2)) 
+
+ds.popG.2_4_08<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%filter(pweight>0) %>% filter(year==2008)%>% filter(zscore>=(-5)) %>% filter(sexe==0)%>%filter(zscore<=(5))
+ds.stuntG.08<- ds.popG.2_4_08 %>% filter(zscore<=(-2)) 
+
+stunt.popB.08=sum(ds.stuntB.08$individual*ds.stuntB.08$pweight)/sum(ds.popB.2_4_08$individual*ds.popB.2_4_08$pweight)
+stunt.popG.08=sum(ds.stuntG.08$individual*ds.stuntG.08$pweight)/sum(ds.popG.2_4_08$individual*ds.popG.2_4_08$pweight)
+
+
+POPB<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"=stunt.popB.88)%>% mutate("1993"=stunt.popB.93) %>% mutate("2008"=stunt.popB.08)%>% mutate(Sex="Boys")%>% select(Sex,"1988","1993","2008")
+
+POPG<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"=stunt.popG.88)%>% mutate("1993"=stunt.popG.93) %>% mutate("2008"=stunt.popG.08)%>% mutate(Sex="Girls")%>% select(Sex,"1988","1993","2008")
+
+
+ObsPOPB<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"= sum(ds.popB.2_4_88$individual))%>%mutate("1993"=sum(ds.popB.2_4_93$individual)) %>%mutate("2008"=sum(ds.popB.2_4_08$individual))%>% mutate(Sex="Observations")
+ObsPOPG<-ds %>% filter(hhid==1) %>%select(.)%>% mutate("1988"=sum(ds.popG.2_4_88$individual))%>%mutate("1993"=sum(ds.popG.2_4_93$individual)) %>%mutate("2008"=sum(ds.popG.2_4_08$individual))%>% mutate(Sex="Observations")
+
+TAB.BO<-rbind(POPB,ObsPOPB)
+TAB.GO<-rbind(POPG,ObsPOPG)
+
+TABQ3c<-rbind(TAB.BO,TAB.GO)
+
+TABQ3c
+```
+
+```{r,echo=FALSE}
+
+
+kable(TABQ3c, caption= 'Stunting rate by Sex over time', col.names=c("Sex","1988","1993","2008"), align=c("l","c","c","c"),digits=3, booktab=T)%>% pack_rows("Boys", 1,2)%>%pack_rows("Girls", 3, 4)%>%kable_styling(latex_options = "HOLD_position")
+
+```
+
+Looking at the table we see like in the previous question, that the stunting rate grows between 1988 and 1993 then decreases in 2008 but doesn't return to its pre-93 levels for boys and for girls.
+Comparing boys and girls, we see that boys have a systematically higher stunting rate than girls in all 3 periods. What we notice however is that that throughout the periods, the difference seems to always be around 2 percentage points.
+
+
+# Q4 Height and poverty
+
+## (A)
+```{r,include=F}
+dfq4.1<-dfq2 %>% filter(zscore>=(-5)) %>% filter(age>=24) %>% filter(age<=48) %>% filter(year==1988) %>% mutate(Stunted=(ifelse(zscore<(-2),1,0)))%>%filter(zscore<=(5))
+
+
+dfq4.2<-dfq2 %>% filter(zscore>=(-5)) %>% filter(age>=24) %>% filter(age<=48) %>% filter(year==1993)%>% mutate(Stunted=(ifelse(zscore<(-2),1,0)))%>%filter(zscore<=(5))
+
+dfq4.3<-dfq2 %>% filter(zscore>=(-5)) %>% filter(age>=24) %>% filter(age<=48) %>% filter(year==2008)%>% mutate(Stunted=(ifelse(zscore<(-2),1,0)))%>%filter(zscore<=(5))
+
+
+
+REG.88<-lm(Stunted~conspc88,weights =pweight,data=dfq4.1)
+REG.93<-lm(Stunted~conspc88,weights =pweight,data=dfq4.2)
+REG.08<-lm(Stunted~conspc88,weights =pweight,data=dfq4.3)
+
+REG.88
+REG.93
+REG.08
+
+
+```
+
+\begin{table}[H] \centering 
+  \caption{Relationship between stunting rate and consumption per capita 1988-2008} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{5pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex] & \multicolumn{3}{c}{Stunted} \\ 
+\\[-1.8ex] & 1988 & 1993 & 2008\\ 
+\hline \\[-1.8ex] 
+ Consumption per capita* & $-$0.0001$^{***}$ & $-$0.0003$^{***}$ & $-$0.0001$^{***}$ \\ 
+  & (0.00002) & (0.00004) & (0.00004) \\ 
+  & & & \\ 
+ Constant & 0.284$^{***}$ & 0.481$^{***}$ & 0.415$^{***}$ \\ 
+  & (0.013) & (0.013) & (0.015) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 2,769 & 3,652 & 2,341 \\ 
+R$^{2}$ & 0.008 & 0.013 & 0.005 \\ 
+Adjusted R$^{2}$ & 0.008 & 0.013 & 0.005 \\ 
+Residual Std. Error & 0.402 (df = 2767) & 0.494 (df = 3650) & 0.497 (df = 2339) \\ 
+F Statistic & 23.110$^{***}$ (df = 1; 2767) & 49.427$^{***}$ (df = 1; 3650) & 12.308$^{***}$ (df = 1; 2339) \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:*Constant in 88 prices}  & \multicolumn{3}{c}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+### (B)
+
+As expected, we see that probability of being stunted decreases with income per capita. Indeed, in we see that a 1 unit increase in per capita income decreased the probability of being stunted in 1988,1993,2008 by (respectively) (0.0001175*100=)0.01175%,0.0277%  and 0.01406%. These results are statistically significant at less than the 0.01% level, we can see that with the p-value<0.0001.
+
+We notice that income per capita was more important in 1993 compared to the other years, to impact stuntedness of a child. It may be that a shock impacted prices of food stuff, which made the value of 1 unit of currency relatively more important.
+
+
+The limitation of our regression are numerous:
+
+- We cleaned our data multiple times, first through height then through Z scores. Which mean our regression concerns only a small fraction of the original sample.
+
+- The small simple size also decreases the power of our regression.
+- The R square is very very small, showing the weakness of our regression in predicting stunting only with per capita expenditure. 
+
+
+\pagebreak
+
+# Part 3, A meaningful table (?)
+
+```{r,include=F}
+
+
+df<-read_csv("Data/OECD.csv")
+df.filtered<- df %>% filter(Variable=="Inflows of foreign population by nationality") %>% select(`Country of birth/nationality`,COU,Year,Value) %>%rename(COB2=`Country of birth/nationality`)
+
+ds.dev_ass<-read_csv("Data/ODApc3.csv")%>% drop_na()%>%select("Country Name","2000 [YR2000]":"2018 [YR2018]")
+ds.dev_ass[2,"Country Name"]<-"Viet Nam"
+#ds.dev_ass[3,"Country Name"]<-"Côte d'Ivoire"
+ds.dev_ass<- ds.dev_ass %>%rename(`2000`=`2000 [YR2000]`)%>% rename(`2001`=`2001 [YR2001]`)%>%rename(`2002`=`2002 [YR2002]`)%>%rename(`2003`=`2003 [YR2003]`)%>%rename(`2004`=`2004 [YR2004]`)%>%rename(`2005`=`2005 [YR2005]`)%>%rename(`2006`=`2006 [YR2006]`)%>%rename(`2007`=`2007 [YR2007]`)%>%rename(`2008`=`2008 [YR2008]`)%>%rename(`2009`=`2009 [YR2009]`)%>%
+ rename(`2010`=`2010 [YR2010]`)%>%rename(`2011`=`2011 [YR2011]`)%>%
+ rename(`2012`=`2012 [YR2012]`)%>%rename(`2013`=`2013 [YR2013]`)%>%rename(`2014`=`2014 [YR2014]`)%>%rename(`2015`=`2015 [YR2015]`)%>%rename(`2016`=`2016 [YR2016]`)%>%rename(`2017`=`2017 [YR2017]`)%>%rename(`2018`=`2018 [YR2018]`)%>% rename(COB=`Country Name`)%>%pivot_longer(2:19,names_to = "Y") %>%rename(`Official Development Aid (ODA)`=value)%>%select(COB,Y,`Official Development Aid (ODA)`)
+
+
+
+```
+
+
+```{r,include=F}
+RWD.1<-df.filtered %>% filter(COB2=="Rwanda") %>% select(COB2,Year,Value)%>%group_by(COB2,Year)%>%summarize_all(funs(sum(.)))%>%filter(Year!=2018)
+ODA.1<-ds.dev_ass%>% filter(COB =="Rwanda")
+
+RWD<-cbind(RWD.1,ODA.1)%>%select(COB,Year,Value,`Official Development Aid (ODA)`)
+
+GTML.1<-df.filtered%>% filter(COB2=="Guatemala")%>% select(COB2,Year,Value)%>%select(COB2,Year,Value)%>%group_by(COB2,Year)%>%summarize_all(funs(sum(.))) %>%filter(Year!=2018)
+ODA.2<-ds.dev_ass%>% filter(COB=="Guatemala")
+GLA<-cbind(GTML.1,ODA.2)%>%select(COB,Year,Value,`Official Development Aid (ODA)`)
+
+vtm.1<-df.filtered%>% filter(COB2=="Viet Nam")%>% select(COB2,Year,Value)%>%select(COB2,Year,Value)%>%group_by(COB2,Year)%>%
+  summarize_all(funs(sum(.)))%>%filter(Year!=2018)
+ODA.3<-ds.dev_ass%>% filter(COB=="Viet Nam")
+Viet<-cbind(vtm.1,ODA.3)%>%select(COB,Year,Value,`Official Development Aid (ODA)`)
+
+
+JMC.1<-df.filtered %>% filter(COB2=="Jamaica")%>% select(COB2,Year,Value)%>%select(COB2,Year,Value)%>%group_by(COB2,Year)%>%summarize_all(funs(sum(.))) %>%filter(Year!=2018)
+ODA.5<-ds.dev_ass%>% filter(COB=="Jamaica")
+JMC<-cbind(JMC.1,ODA.5)%>%select(COB,Year,Value,`Official Development Aid (ODA)`)
+
+Reg.rwd<-lm(log(Value)~log(`Official Development Aid (ODA)`),data=RWD)
+Reg.GLA<-lm(log(Value)~log(`Official Development Aid (ODA)`),data=GLA)
+Reg.Viet<-lm(log(Value)~log(`Official Development Aid (ODA)`),data=Viet)
+Reg.jmc<-lm(log(Value)~log(`Official Development Aid (ODA)`),data=JMC)
+
+
+
+summary(Reg.rwd)
+summary(Reg.GLA)
+summary(Reg.Viet)
+summary(Reg.jmc)
+
+
+
+```
+\begin{table}[H] \centering 
+  \caption{Regression of Immigration on ODA} 
+  \label{} 
+  \begin{threeparttable}
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}{\textit{Immigration inflow to OECD countries}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & \multicolumn{4}{c}{For:} \\ 
+\\[-1.8ex] & Rwanda & Guatemala & Vietnam & Jamaica\\ 
+\hline \\[-1.8ex] 
+ Official Development Aid (per capita) & 0.894$^{***}$ & 0.308$^{*}$ & 0.561$^{**}$ & 0.0665$^{}$ \\ 
+  & (0.109) & (0.174) & (0.215) & (0.054) \\ 
+  & & & & \\ 
+ Constant & 3.592$^{***}$ & 8.697$^{***}$ & 9.576$^{***}$ & 9.796$^{***}$ \\ 
+  & (0.469) & (0.558) & (0.712) & (0.159) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 18 & 18 & 18 & 18 \\ 
+R$^{2}$ & 0.809 & 0.164 & 0.298 & 0.0861 \\ 
+F Statistic (df = 1; 16) & 67.872$^{***}$ & 3.131$^{*}$ & 6.795$^{**}$ & 1.507$^{}$ \\ 
+\hline 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\begin{tablenotes}
+\item Note: In the regression table above, we've regressed the natural logarithms of Immigration inflow to OECD countries on natural logarithms of ODA per capita. We've run that regression for Rwanda, Guatemala, Vietnam and Jamaica for the period 2000-2017. Significance levels $^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01. The standard errors are in parentheses.
+\item Source: World bank "https://databank.worldbank.org/source/world-development-indicators" and OECD "https://stats.oecd.org/Index.aspx?DataSetCode=MIG"
+
+
+
+\end{tablenotes}
+\end{threeparttable}
+\end{table} 
+
+The question that we are trying to answer with this regression is the following:
+"Does foreign aid deter immigration from lower and lower middle income countries?"
+
+We've chosen these 4 countries randomly making sure that they were low income countries or lower middle income countries and they were from different regions (Latin America, carribean, Africa, Asia). What we see from our regression is a positive statistically significant relationship (at the 5% level) between immigration and official development aid (ODA) per capita for 2 of the 4 countries studied. For example in the case of Rwanda, a 1% increase in ODA per capita  is associated with a 0.894% increase of immigration to OECD countries. For Vietnam, the relationship goes the same way with an 1% increase in ODA being associated with a 0.56% increase of immigration.
+For Jamaica and Guatemala, our findings are either not statistically significant, or not statistically significant at the 5% level.
+
+One possible explanation for our findings ( in the case of Rwanda and Vietnam) is the fact that ODA and economic conditions vary inversely.In bad economic conditions, people with sufficient capital tend to leave the country because they're not confident in the future and believe life will be better elsewhere.Therefore, ODA and immigration are positively correlated.
+
+Another explanation could be that, ODA improves dramatically the economic conditions(economic growth, youth employment) of the receiving country (which is debatable). The increase in income generated by improved economic conditions would allow people that could not afford to immigrate previously to finally do it therefore explaining the positive correlation between immigration and ODA. The difference between the people immigrating in this case is that they are people that see immigration as an investment, we cant consider to be well off compared to the previous case.
+
+The implication for policy in both cases however is leaning towards rethinking the use of foreign aid as a tool to deter immigration.
+
+
+
+\pagebreak
+
+
+```{r,eval=F}
+
+library(tidyverse)
+library(haven)
+library(broom)
+library(kableExtra)
+library(purrr)
+library(ivpack)
+library(stargazer)
+library(dplyr)
+
+ds<-read_dta("Data/civ88_mort.dta")
+summary(ds)
+
+`
+# PART 1, Child Mortality in Cote d'Ivoire
+## Q1
+
+ds<-ds%>%mutate (nweight=n_wom*pweight)
+
+
+
+## Q2
+
+### (A)
+
+
+
+### (B)
+#### i.
+
+ds.Q2g1<- ds%>% filter(girls_l5>0)%>%select(hhid:nweight)
+ds.Q2b1<- ds %>% filter(boys_l5>0)%>%select(hhid:nweight)
+mort_rate_gl5=sum(ds.Q2g1$dgirls_l5*ds.Q2g1$nweight)/
+  sum(ds.Q2g1$girls_l5*ds.Q2g1$nweight)
+mort_rate_gl5
+mort_rate_bl5=sum(ds.Q2b1$dboys_l5*ds.Q2b1$nweight)/
+  sum(ds.Q2b1$boys_l5*ds.Q2b1$nweight)
+mort_rate_bl5
+
+
+M1<-ds %>% filter(hhid==1) %>%select(.)%>%
+  mutate(Boys=mort_rate_bl5)%>% mutate(Girls=mort_rate_gl5) %>% mutate(Method="")%>% 
+  select(Method,Boys,Girls)
+
+
+Obs1<-ds %>% filter(hhid==1) %>%select(.)%>%
+  mutate(Boys=sum(ds.Q2b1$boys_l5))%>%
+  mutate(Girls=sum(ds.Q2g1$girls_l5)) %>% mutate(Method="N")
+
+M1<-rbind(M1,Obs1)
+
+ds.Q2g2<- ds%>% filter(girls>0)%>%select(hhid:nweight)
+ds.Q2b2<- ds %>% filter(boys>0)%>%select(hhid:nweight)
+
+mort_rate_gu5=sum((ds.Q2g2$dgirls_u5-ds.Q2g2$dgirls_l5)*ds.Q2g2$nweight)/
+  sum((ds.Q2g2$girls-ds.Q2g2$girls_l5)*ds.Q2g2$nweight)
+                                                  
+mort_rate_bu5=sum((ds.Q2b2$dboys_u5-ds.Q2b2$dboys_l5)*ds.Q2b2$nweight)/
+  sum((ds.Q2b2$boys-ds.Q2b2$boys_l5)*ds.Q2b2$nweight)
+
+ M2<-ds %>% filter(hhid==1) %>%select(.)%>% 
+   mutate(Boys=mort_rate_bu5)%>% mutate(Girls=mort_rate_gu5) %>% mutate(Method="")%>%
+   select(Method,Boys,Girls) 
+ 
+Obs2<-ds %>% filter(hhid==1) %>%select(.)%>% mutate(Boys=(sum(ds.Q2b2$boys)-sum(ds.Q2b2$boys_l5)))%>%
+  mutate(Girls=(sum(ds.Q2g2$girls)-sum(ds.Q2g2$girls_l5))) %>% mutate(Method="N")
+
+M2<-rbind(M2,Obs2)
+TAB<-rbind(M1,M2)
+
+
+kable(TAB, caption= 'Infant mortality by sex',
+      col.names=c("","Boys","Girls"), align=c("l","c","c"),digits=3,booktab=T)%>%
+  pack_rows("Method 1", 1,2)%>%pack_rows("Method 2", 3, 4) %>% kable_styling() %>% 
+  add_footnote("Method 1 uses the children born 0-4 years ago",
+               notation = "alphabet")%>% 
+  add_footnote("Method 2 uses children born 5-9 years ago",notation = "alphabet")
+
+
+
+
+
+#### ii.
+
+
+## Q2
+
+library(tidyverse)
+library(haven)
+library(broom)
+library(kableExtra)
+library(purrr)
+library(ivpack)
+
+df<-read_dta("Data/civ88-08_nutri.dta")
+summary(df)
+
+
+
+
+
+dfq2<-df %>% filter(height>=20)%>%filter(height<=170)%>%
+  mutate(individual=1)
+dfq2<-mutate(dfq2,zscore=((dfq2$height-dfq2$medheight)/
+                            dfq2$stdheight))
+
+dfq2.1<-df %>% filter(height>=20) %>%
+  filter(height<=170)%>% mutate(individual=1)%>%
+  filter(dfq2$year==1988)
+dfq2.1<-mutate(dfq2.1,zscore=((dfq2.1$height-dfq2.1$medheight)/
+                                dfq2.1$stdheight))
+
+dfq2.2<-df %>% filter(height>=20) %>%
+  filter(height<=170)%>% mutate(individual=1)%>%
+  filter(dfq2$year==1993)
+dfq2.2<-mutate(dfq2.2,zscore=((dfq2.2$height-dfq2.2$medheight)/
+                                dfq2.2$stdheight))
+
+dfq2.3<-df %>% filter(height>=20)%>%filter(height<=170)%>% mutate(individual=1)%>%filter(dfq2$year==2008)
+dfq2.3<-mutate(dfq2.3,zscore=((dfq2.3$height-dfq2.3$medheight)/
+                                dfq2.3$stdheight))
+
+z1<-tidy(summary(dfq2.1$zscore)) %>% 
+  mutate(Std.dev=sqrt(var(dfq2.1$zscore)))%>% 
+  mutate(Observations=sum(dfq2.1$individual))%>%
+  mutate(Year="1988")%>%
+  select(Year,minimum,median,mean,maximum,Std.dev,Observations)
+
+z2<- tidy(summary(dfq2.2$zscore)) %>% 
+  mutate(Std.dev=sqrt(var(dfq2.2$zscore)))%>%
+  mutate(Observations=sum(dfq2.2$individual))%>%
+  mutate(Year="1993")%>%
+  select(Year,minimum,median,mean,maximum,Std.dev,Observations)
+
+
+z3<-tidy(summary(dfq2.3$zscore))%>% mutate(Std.dev=sqrt(var(dfq2.3$zscore)))%>% mutate(Observations=sum(dfq2.3$individual))%>%mutate(Year="2008")%>% select(Year,minimum,median,mean,maximum,Std.dev,Observations)
+
+z<-rbind(z1,z2,z3)
+
+kable(z, caption= 'Summary statistics on of z-scores of the sample ', col.names=c("Year","Minimum","Median","Mean","Maximum",
+    "Standard deviation","Observations"), 
+    align=c("l","r","r","r","r","r","r","r"),digits=3, 
+      booktab=T)%>% kable_styling(latex_options = "HOLD_position") %>% 
+  add_footnote("The sample of z-scores here are only for
+  the individuals with a height superior to 20 cm 
+  and shorter than 170 cm. These are the 2 lowest 
+values possible for the youngest newborn to have 
+lived and the tallest 5 year old ever recorded",notation = "alphabet") 
+
+## Q3
+
+### (A)
+
+
+ds.pop.2_4_88<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0) %>%
+  filter(year==1988)%>% filter(zscore>=(-5))%>%
+  filter(zscore<=(5))
+ds.stunt.88<- ds.pop.2_4_88 %>% filter(zscore<=(-2)) 
+
+stunt.pop.88=sum(ds.stunt.88$individual*ds.stunt.88$pweight)/
+  sum(ds.pop.2_4_88$individual*ds.pop.2_4_88$pweight)
+
+
+
+ds.pop.2_4_93<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0) %>% filter(year==1993)%>%
+  filter(zscore>=(-5))%>%
+  filter(zscore<=(5))
+ds.stunt.93<- ds.pop.2_4_93 %>% 
+  filter(zscore<=(-2)) 
+
+stunt.pop.93=sum(ds.stunt.93$individual*ds.stunt.93$pweight)/
+  sum(ds.pop.2_4_93$individual*ds.pop.2_4_93$pweight)
+
+ds.pop.2_4_08<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0) %>% 
+  filter(year==2008)%>% filter(zscore>=(-5))%>%
+  filter(zscore<=(5))
+ds.stunt.08<- ds.pop.2_4_08 %>% filter(zscore<=(-2)) 
+
+stunt.pop.08=sum(ds.stunt.08$individual*ds.stunt.08$pweight)/
+  sum(ds.pop.2_4_08$individual*ds.pop.2_4_08$pweight)
+
+POP<-ds %>% filter(hhid==1) %>%
+  select(.)%>% mutate("1988"=stunt.pop.88)%>%
+  mutate("1993"=stunt.pop.93) %>%
+  mutate("2008"=stunt.pop.08)%>% 
+  mutate(Region="National")%>% 
+  select(Region,"1988","1993","2008")
+
+ObsPOP<-ds %>% filter(hhid==1) %>%select(.)%>%
+  mutate("1988"=sum(ds.pop.2_4_88$individual))%>%
+  mutate("1993"=sum(ds.pop.2_4_93$individual)) %>%
+  mutate("2008"=sum(ds.pop.2_4_08$individual))%>%
+  mutate(Region="Observations")
+
+TABQ3<-rbind(POP,ObsPOP)
+
+TABQ3
+
+
+
+ds.popN.2_4_88<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0)%>%
+  filter(year==1988)%>% filter(north==1)%>% 
+  filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.popS.2_4_88<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0)%>% 
+  filter(year==1988)%>% filter(north==0)%>%
+  filter(zscore>=(-5))%>%filter(zscore<=(5))
+
+ds.stunt.north_88<-ds.popN.2_4_88 %>% 
+  filter(zscore<=(-2))%>% filter(north==1) %>% mutate(individual=1)
+ds.stunt.south_88<-ds.popS.2_4_88 %>% filter(zscore<=(-2))  
+%>%filter(north==0)%>% mutate(individual=1)
+
+stunt.north.88=sum(ds.stunt.north_88$individual*ds.stunt.north_88$pweight)/
+  sum(ds.popN.2_4_88$individual*ds.popN.2_4_88$pweight)
+stunt.south.88=sum(ds.stunt.south_88$individual*ds.stunt.south_88$pweight)/
+  sum(ds.popS.2_4_88$individual*ds.popS.2_4_88$pweight)
+
+
+ds.popN.2_4_93<-dfq2 %>% filter(age>=24) %>% 
+  filter(age<=48)%>%filter(pweight>0)%>% filter(year==1993)%>%
+  filter(north==1)%>% 
+  filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.popS.2_4_93<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0)%>% filter(year==1993)%>% 
+  filter(north==0)%>% 
+  filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.stunt.north_93<-ds.popN.2_4_93 %>% 
+  filter(zscore<=(-2))  %>% mutate(individual=1)
+ds.stunt.south_93<-ds.popS.2_4_93 %>% 
+  filter(zscore<=(-2)) %>% mutate(individual=1)
+
+stunt.north.93=sum(ds.stunt.north_93$individual*ds.stunt.north_93$pweight)/
+  sum(ds.popN.2_4_93$individual*ds.popN.2_4_93$pweight)
+stunt.south.93=sum(ds.stunt.south_93$individual*ds.stunt.south_93$pweight)/
+  sum(ds.popS.2_4_93$individual*ds.popS.2_4_93$pweight)
+
+
+ds.popN.2_4_08<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0)%>% 
+  filter(year==2008)%>% filter(north==1)%>% 
+  filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.popS.2_4_08<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0)%>% filter(year==2008) %>%
+  filter(north==0)%>% filter(zscore>=(-5))%>%filter(zscore<=(5))
+ds.stunt.north_08<-ds.popN.2_4_08 %>% 
+  filter(zscore<=(-2)) %>%mutate(individual=1)
+ds.stunt.south_08<-ds.popS.2_4_08%>%
+  filter(zscore<=(-2)) %>% mutate(individual=1)
+
+stunt.north.08=
+  sum(ds.stunt.north_08$individual*ds.stunt.north_08$pweight)/
+  sum(ds.popN.2_4_08$individual*ds.popN.2_4_08$pweight)
+stunt.south.08=
+  sum(ds.stunt.south_08$individual*ds.stunt.south_08$pweight)/
+  sum(ds.popS.2_4_08$individual*ds.popS.2_4_08$pweight)
+
+POPN<-ds %>% filter(hhid==1) %>%select(.)%>% 
+  mutate("1988"=stunt.north.88)%>% mutate("1993"=stunt.north.93) %>%
+  mutate("2008"=stunt.north.08)%>% mutate(Region="North")%>%
+  select(Region,"1988","1993","2008")
+
+POPS<-ds %>% filter(hhid==1) %>%
+  select(.)%>% mutate("1988"=stunt.south.88)%>% 
+  mutate("1993"=stunt.south.93) %>% 
+  mutate("2008"=stunt.south.08)%>%
+  mutate(Region="South")%>% 
+  select(Region,"1988","1993","2008")
+
+
+ObsN<-ds %>% filter(hhid==1) %>%select(.)%>% 
+  mutate("1988"=sum(ds.popN.2_4_88$individual))%>%
+  mutate("1993"=sum(ds.popN.2_4_93$individual)) %>%
+  mutate("2008"=sum(ds.popN.2_4_08$individual))%>%
+  mutate(Region="Observations")
+
+POPobsN<-rbind(POPN,ObsN)
+
+ObsS<-ds %>% filter(hhid==1) %>%select(.)%>% 
+  mutate("1988"= sum(ds.popS.2_4_88$individual))%>%
+  mutate("1993"=sum(ds.popN.2_4_93$individual)) %>%
+  mutate("2008"=sum(ds.popN.2_4_88$individual))%>%
+  mutate(Region="Observations")
+
+POPobsS<-rbind(POPS,ObsS)
+
+TABQ3b<-rbind(POPobsS,POPobsN)
+
+
+TABQ3.tot<-rbind(TABQ3b,TABQ3)
+TABQ3.tot
+
+
+
+kable(TABQ3.tot, caption='Stunting rate by region', 
+      col.names=c("Region","1988","1993","2008"),
+      align=c("l","c","c","c"),digits=3, booktab=T)%>%
+  pack_rows("Southern",1,2)%>%
+  pack_rows("Northern",3,4)%>%pack_rows("National",5,6)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+
+
+
+### (B)
+
+
+
+ds.popB.2_4_88<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%
+  filter(pweight>0) %>% filter(year==1988)%>% 
+  filter(zscore>=(-4)) %>% filter(sexe==1)%>%
+  filter(zscore<=(4))
+ds.stuntB.88<- ds.popB.2_4_88 %>% filter(zscore<=(-2)) 
+
+ds.popG.2_4_88<-dfq2 %>% filter(age>=24) %>% 
+  filter(age<=48)%>%filter(pweight>0) %>% filter(year==1988)%>% 
+  filter(zscore>=(-4)) %>% filter(sexe==0)%>%
+  filter(zscore<=(4))
+ds.stuntG.88<- ds.popG.2_4_88 %>% 
+  filter(zscore<=(-2)) 
+
+stunt.popB.88=sum(ds.stuntB.88$individual*ds.stuntB.88$pweight)/
+  sum(ds.popB.2_4_88$individual*ds.popB.2_4_88$pweight)
+stunt.popG.88=sum(ds.stuntG.88$individual*ds.stuntG.88$pweight)/
+  sum(ds.popG.2_4_88$individual*ds.popG.2_4_88$pweight)
+
+ds.popB.2_4_93<-dfq2 %>% filter(age>=24) %>% 
+  filter(age<=48)%>%filter(pweight>0) %>% 
+  filter(year==1993)%>% filter(zscore>=(-4)) %>% 
+  filter(sexe==1)%>%filter(zscore<=(4))
+ds.stuntB.93<- ds.popB.2_4_93 %>% filter(zscore<=(-2)) 
+
+ds.popG.2_4_93<-dfq2 %>% filter(age>=24) %>% filter(age<=48)%>%
+  filter(pweight>0) %>% filter(year==1993)%>% filter(zscore>=(-4)) %>% filter(sexe==0)%>%
+  filter(zscore<=(4))
+ds.stuntG.93<- ds.popG.2_4_93 %>% filter(zscore<=(-2)) 
+
+stunt.popB.93=sum(ds.stuntB.93$individual*ds.stuntB.93$pweight)/
+  sum(ds.popB.2_4_93$individual*ds.popB.2_4_93$pweight)
+stunt.popG.93=sum(ds.stuntG.93$individual*ds.stuntG.93$pweight)/
+  sum(ds.popG.2_4_93$individual*ds.popG.2_4_93$pweight)
+
+ds.popB.2_4_08<-dfq2 %>% filter(age>=24) %>% 
+  filter(age<=48)%>%filter(pweight>0) %>% filter(year==2008)%>%
+  filter(zscore>=(-4)) %>%
+  filter(sexe==1)%>%filter(zscore<=(4))
+ds.stuntB.08<- ds.popB.2_4_08 %>% filter(zscore<=(-2)) 
+
+ds.popG.2_4_08<-dfq2 %>% filter(age>=24) %>%
+  filter(age<=48)%>%filter(pweight>0) %>% filter(year==2008)%>%
+  filter(zscore>=(-4)) %>%
+  filter(sexe==0)%>%filter(zscore<=(4))
+ds.stuntG.08<- ds.popG.2_4_08 %>% filter(zscore<=(-2)) 
+
+stunt.popB.08=sum(ds.stuntB.08$individual*ds.stuntB.08$pweight)/
+  sum(ds.popB.2_4_08$individual*ds.popB.2_4_08$pweight)
+stunt.popG.08=sum(ds.stuntG.08$individual*ds.stuntG.08$pweight)/
+  sum(ds.popG.2_4_08$individual*ds.popG.2_4_08$pweight)
+
+
+POPB<-ds %>% filter(hhid==1) %>%
+  select(.)%>% mutate("1988"=stunt.popB.88)%>% 
+  mutate("1993"=stunt.popB.93) %>% 
+  mutate("2008"=stunt.popB.08)%>% mutate(Sex="Boys")%>% 
+  select(Sex,"1988","1993","2008")
+
+POPG<-ds %>% filter(hhid==1) %>%select(.)%>%
+  mutate("1988"=stunt.popG.88)%>% 
+  mutate("1993"=stunt.popG.93) %>% 
+  mutate("2008"=stunt.popG.08)%>%
+  mutate(Sex="Girls")%>%
+  select(Sex,"1988","1993","2008")
+
+
+ObsPOPB<-ds %>% filter(hhid==1) %>%select(.)%>% 
+  mutate("1988"= 1395)%>%mutate("1993"=1723) %>%
+  mutate("2008"=1088)%>% mutate(Sex="Observations")
+ObsPOPG<-ds %>% filter(hhid==1) %>%
+  select(.)%>% mutate("1988"=1318)%>%
+  mutate("1993"=1720) %>%mutate("2008"=1070)%>%
+  mutate(Sex="Observations")
+
+TAB.BO<-rbind(POPB,ObsPOPB)
+TAB.GO<-rbind(POPG,ObsPOPG)
+
+TABQ3c<-rbind(TAB.BO,TAB.GO)
+
+TABQ3c
+
+
+
+
+
+kable(TABQ3c, caption= 'Stunting rate by Sex over time',
+      col.names=c("Sex","1988","1993","2008"), 
+      align=c("l","c","c","c"),digits=3, booktab=T)%>%
+  pack_rows("Boys", 1,2)%>%pack_rows("Girls", 3, 4)%>%
+  kable_styling(latex_options = "HOLD_position")
+
+
+
+
+
+
+# Q4 Height and poverty
+
+## (A)
+
+dfq4.1<-dfq2 %>% filter(zscore>=(-4)) %>% 
+  filter(age>=24) %>% filter(age<=48) %>% 
+  filter(year==1988) %>% mutate(Stunted=(ifelse(zscore<(-2),1,0)))%>%
+  filter(zscore<=(4))
+
+
+dfq4.2<-dfq2 %>% filter(zscore>=(-4)) %>% filter(age>=24) %>% 
+  filter(age<=48) %>% filter(year==1993)%>%
+  mutate(Stunted=(ifelse(zscore<(-2),1,0)))%>%
+  filter(zscore<=(4))
+
+dfq4.3<-dfq2 %>% filter(zscore>=(-4)) %>%
+  filter(age>=24) %>% filter(age<=48) %>% filter(year==2008)%>% mutate(Stunted=(ifelse(zscore<(-2),1,0)))%>%
+  filter(zscore<=(4))
+
+
+
+REG.88<-lm(Stunted~conspc88,weights =pweight,data=dfq4.1)
+REG.93<-lm(Stunted~conspc88,weights =pweight,data=dfq4.2)
+REG.08<-lm(Stunted~conspc88,weights =pweight,data=dfq4.3)
+
+REG.88
+REG.93
+REG.08
+
+
+
+\begin{table}[H] \centering 
+\setlength{\tabcolsep}{1pt}
+  \caption{Relationship between and stunting and consumption per capita} 
+  \label{} 
+\begin{tabular}{@{\extracolsep{3pt}}lccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{3}{c}{\textit{Dependent variable:}} \\ 
+\cline{2-4} 
+\\[-1.8ex] & \multicolumn{3}{c}{Stunted} \\ 
+\\[-1.8ex] & (1988) & (1993) & (2008)\\ 
+\hline \\[-1.8ex] 
+ Consumption per capita & $-$0.0001$^{***}$ &
+   $-$0.0002$^{***}$ & $-$0.0001$^{***}$ \\ 
+  & (0.00002) & (0.00004) & (0.00004) \\ 
+  & & & \\ 
+ Constant & 0.256$^{***}$ & 0.432$^{***}$ & 0.356$^{***}$ \\ 
+  & (0.012) & (0.013) & (0.015) \\ 
+  & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 2,713 & 3,443 & 2,158 \\ 
+R$^{2}$ & 0.006 & 0.011 & 0.006 \\ 
+Adjusted R$^{2}$ & 0.006 & 0.011 & 0.006 \\ 
+Residual Std. Error & 0.389 (df = 2711) & 
+  0.483 (df = 3441) & 0.476 (df = 2156) \\ 
+F Statistic & 16.411$^{***}$ (df = 1; 2711) &
+  38.216$^{***}$ (df = 1; 3441) & 13.371$^{***}$ (df = 1; 2156) \\ 
+\hline 
+\hline \\[-1.8ex] 
+\textit{Note:*Constant in 98 prices} & 
+  \multicolumn{3}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\ 
+\end{tabular} 
+\end{table} 
+
+
+
+# Part 3, A meaningful table (?)
+
+
+
+
+df<-read_csv("Data/OECD.csv")
+df.filtered<- df %>% 
+  filter(Variable=="Inflows of foreign population by nationality") %>% 
+  select(`Country of birth/nationality`,COU,Year,Value) %>%
+  rename(COB2=`Country of birth/nationality`)
+
+ds.dev_ass<-read_csv("Data/ODApc3.csv")%>% drop_na()%>%
+  select("Country Name","2000 [YR2000]":"2018 [YR2018]")
+ds.dev_ass[2,"Country Name"]<-"Viet Nam"
+#ds.dev_ass[3,"Country Name"]<-"Côte d'Ivoire"
+ds.dev_ass<- ds.dev_ass %>%rename(`2000`=`2000 [YR2000]`)%>%
+  rename(`2001`=`2001 [YR2001]`)%>%
+  rename(`2002`=`2002 [YR2002]`)%>%
+  rename(`2003`=`2003 [YR2003]`)%>%
+  rename(`2004`=`2004 [YR2004]`)%>%
+  rename(`2005`=`2005 [YR2005]`)%>%
+  rename(`2006`=`2006 [YR2006]`)%>%
+  rename(`2007`=`2007 [YR2007]`)%>%rename(`2008`=`2008 [YR2008]`)%>%
+  rename(`2009`=`2009 [YR2009]`)%>%
+ rename(`2010`=`2010 [YR2010]`)%>%rename(`2011`=`2011 [YR2011]`)%>%
+ rename(`2012`=`2012 [YR2012]`)%>%rename(`2013`=`2013 [YR2013]`)%>%
+  rename(`2014`=`2014 [YR2014]`)%>%rename(`2015`=`2015 [YR2015]`)%>%
+  rename(`2016`=`2016 [YR2016]`)%>%rename(`2017`=`2017 [YR2017]`)%>%
+  rename(`2018`=`2018 [YR2018]`)%>% rename(COB=`Country Name`)%>%
+  pivot_longer(2:19,names_to = "Y") %>%rename(`Official Development Aid (ODA)`=value)%>%select(COB,Y,`Official Development Aid (ODA)`)
+
+
+
+
+
+
+RWD.1<-df.filtered %>% filter(COB2=="Rwanda") %>% 
+  select(COB2,Year,Value)%>%group_by(COB2,Year)%>%
+  summarize_all(funs(sum(.)))%>%filter(Year!=2018)
+ODA.1<-ds.dev_ass%>% filter(COB =="Rwanda")
+
+RWD<-cbind(RWD.1,ODA.1)%>%select(COB,Year,Value,`Official Development Aid (ODA)`)
+
+GTML.1<-df.filtered%>% filter(COB2=="Guatemala")%>% select(COB2,Year,Value)%>%select(COB2,Year,Value)%>%
+  group_by(COB2,Year)%>%summarize_all(funs(sum(.))) %>%filter(Year!=2018)
+ODA.2<-ds.dev_ass%>% filter(COB=="Guatemala")
+GLA<-cbind(GTML.1,ODA.2)%>%
+  select(COB,Year,Value,`Official Development Aid (ODA)`)
+
+vtm.1<-df.filtered%>% filter(COB2=="Viet Nam")%>% select(COB2,Year,Value)%>%select(COB2,Year,Value)%>%group_by(COB2,Year)%>%
+  summarize_all(funs(sum(.)))%>%filter(Year!=2018)
+ODA.3<-ds.dev_ass%>% filter(COB=="Viet Nam")
+Viet<-cbind(vtm.1,ODA.3)%>%
+  select(COB,Year,Value,`Official Development Aid (ODA)`)
+
+
+JMC.1<-df.filtered %>% filter(COB2=="Jamaica")%>% select(COB2,Year,Value)%>%select(COB2,Year,Value)%>%
+  group_by(COB2,Year)%>%summarize_all(funs(sum(.))) %>%filter(Year!=2018)
+ODA.5<-ds.dev_ass%>% filter(COB=="Jamaica")
+JMC<-cbind(JMC.1,ODA.5)%>%select(COB,Year,Value,`Official Development Aid (ODA)`)
+
+Reg.rwd<-lm(log(Value)~log(`Official Development Aid (ODA)`),data=RWD)
+Reg.GLA<-lm(log(Value)~log(`Official Development Aid (ODA)`),data=GLA)
+Reg.Viet<-lm(log(Value)~log(`Official Development Aid (ODA)`),data=Viet)
+Reg.jmc<-lm(log(Value)~log(`Official Development Aid (ODA)`),data=JMC)
+
+
+
+summary(Reg.rwd)
+summary(Reg.GLA)
+summary(Reg.Viet)
+summary(Reg.jmc)
+
+
+
+
+\begin{table}[H] \centering 
+  \caption{Regression of Immigration on ODA} 
+  \label{} 
+  \begin{threeparttable}
+\begin{tabular}{@{\extracolsep{5pt}}lcccc} 
+\\[-1.8ex]\hline 
+\hline \\[-1.8ex] 
+ & \multicolumn{4}{c}
+{\textit{Immigration inflow to OECD countries}} \\ 
+\cline{2-5} 
+\\[-1.8ex] & \multicolumn{4}{c}{For:} \\ 
+\\[-1.8ex] & Rwanda & Guatemala & Vietnam & Jamaica\\ 
+\hline \\[-1.8ex] 
+ Official Development Aid (per capita) & 0.894$^{***}$ & 
+   0.308$^{*}$ & 0.561$^{**}$ & 0.0665$^{}$ \\ 
+  & (0.109) & (0.174) & (0.215) & (0.054) \\ 
+  & & & & \\ 
+ Constant & 3.592$^{***}$ & 8.697$^{***}$ & 9.576$^{***}$ & 9.796$^{***}$ \\ 
+  & (0.469) & (0.558) & (0.712) & (0.159) \\ 
+  & & & & \\ 
+\hline \\[-1.8ex] 
+Observations & 18 & 18 & 18 & 18 \\ 
+R$^{2}$ & 0.809 & 0.164 & 0.298 & 0.0861 \\ 
+F Statistic (df = 1; 16) & 67.872$^{***}$ & 3.131$^{*}$ &
+  6.795$^{**}$ & 1.507$^{}$ \\ 
+\hline 
+\hline \\[-1.8ex] 
+\end{tabular} 
+\begin{tablenotes}
+\item Note: In the regression table above, we've regressed 
+the natural logarithms of Immigration inflow to OECD countries on natural 
+logarithms of ODA per capita. We've run that regression for Rwanda,
+Guatemala, Vietnam and Jamaica for the period 2000-2017. 
+Significance levels $^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01. 
+The standard errors are in parentheses.
+
+\end{tablenotes}
+\end{threeparttable}
+\end{table} 
+
+```
+
+
+
+
+
+
+
+
